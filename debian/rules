@@ -1,0 +1,23 @@
+#!/usr/bin/make -f
+
+include /usr/share/dpkg/pkg-info.mk
+
+PYTHON3_VERSIONS = $(shell py3versions -r)
+py3sdo = set -e; $(foreach py, $(PYTHON3_VERSIONS), $(py) $(1);)
+
+%:
+	dh $@ --with python3
+
+override_dh_auto_build:
+	dh_auto_build
+	$(call py3sdo, -m build)
+
+override_dh_auto_install:
+	dh_auto_install
+	mkdir -p debian/$(DEB_SOURCE)/usr/lib/python3/dist-packages/
+	tar -xvzf dist/*.tar.gz -C debian/$(DEB_SOURCE)/usr/lib/python3/dist-packages/
+	cp -r sparse/* debian/$(DEB_SOURCE)/
+
+override_dh_auto_clean:
+	dh_auto_clean
+	rm -rf dist build slacky_manager/*.egg-info
