@@ -1,4 +1,4 @@
-import telebot
+from telebot.async_telebot import AsyncTeleBot
 from os import environ
 
-bot = telebot.TeleBot(environ['TELEGRAM_BOT_TOKEN'], parse_mode=None)
+bot = AsyncTeleBot(environ['TELEGRAM_BOT_TOKEN'], parse_mode=None)

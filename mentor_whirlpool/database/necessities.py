@@ -1,5 +1,5 @@
 class Database:
-    async def initdb():
+    async def initdb(self):
         """
         Creates database model if not declared already
         this is generally achieved with SQL's CREATE TABLE IF NOT EXISTS
@@ -15,10 +15,12 @@ class Database:
                 Table "MENTORS":
         ID(PRIMARY KEY) | NAME(TEXT NOT NULL) |
         CHAT_ID(BIGINT / at least 52 bits NOT NULL) | LOAD(INT)
+                Table "ADMINS":
+        ID(PRIMARY KEY) | CHAT_ID (BIGINT / at least 52 bits NOT NULL)
         """
         raise NotImplementedError()
 
-    async def add_course_work(line):
+    async def add_course_work(self, line):
         """
         Adds a new course work to the database
         Adding a course work updates SUBJECTS table if needed subject is new
@@ -36,7 +38,7 @@ class Database:
         """
         raise NotImplementedError()
 
-    async def modify_course_work(line):
+    async def modify_course_work(self, line):
         """
         Modifies an existing line in the database, matching 'chat_id' field
         Modifying a course work may update SUBJECTS table if subject is changed
@@ -53,7 +55,7 @@ class Database:
         """
         raise NotImplementedError()
 
-    async def remove_course_work(id):
+    async def remove_course_work(self, id):
         """
         Removes a line from COURSE_WORKS table
         Removing a course work may update SUBJECTS table if no other course
@@ -70,7 +72,7 @@ class Database:
         """
         raise NotImplementedError()
 
-    async def add_mentor(line):
+    async def add_mentor(self, line):
         """
         Adds a new mentor to the database
 
@@ -87,7 +89,7 @@ class Database:
         """
         raise NotImplementedError
 
-    async def remove_mentor(id):
+    async def remove_mentor(self, id):
         """
         Removes a line from MENTORS table
 
@@ -103,7 +105,7 @@ class Database:
         """
         raise NotImplementedError
 
-    async def get_course_works(subject):
+    async def get_course_works(self, subject):
         """
         Gets all submitted course works that satisfy the argument subject
         Subject may be empty, in this case, return all course works
@@ -125,7 +127,7 @@ class Database:
         """
         raise NotImplementedError
 
-    async def get_subjects():
+    async def get_subjects(self):
         """
         Gets all lines from SUBJECTS table
 
@@ -136,7 +138,7 @@ class Database:
         """
         raise NotImplementedError
 
-    async def get_mentors():
+    async def get_mentors(self):
         """
         Gets all lines from MENTORS table
 
@@ -148,5 +150,14 @@ class Database:
         raise NotImplementedError
 
 
-# let there be only one (singleton)
-db = Database()
+    async def add_admin(self, chat_id):
+        """
+        Adds a line to ADMINS table
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBAlreadyExists
+        """
+        raise NotImplementedError
+
