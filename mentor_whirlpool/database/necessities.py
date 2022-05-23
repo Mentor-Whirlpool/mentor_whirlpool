@@ -1,5 +1,13 @@
+import psycopg
+from asyncio import create_task
+
+
 class Database:
     # init
+    def __init__(self):
+        self.db = psycopg.AsyncConnection.connect('dbname=mentor_whirlpool '
+                                                  'user=postgres')
+
     async def initdb(self):
         """
         Creates database model if not declared already
@@ -24,9 +32,51 @@ class Database:
                 Table "ADMINS":
         ID(PRIMARY KEY) | CHAT_ID (BIGINT / at least 52 bits NOT NULL)
         """
-        raise NotImplementedError()
+        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS('
+                                    'ID BIGSERIAL PRIMARY KEY,'
+                                    'NAME TEXT NOT NULL,'
+                                    'CHAT_ID BIGINT NOT NULL,'
+                                    'SUBJECTS TEXT[] NOT NULL,'
+                                    'DESCRIPTION TEXT,'
+                                    ')'))
+        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS ACCEPTED('
+                                    'ID BIGSERIAL PRIMARY KEY,'
+                                    'NAME TEXT NOT NULL,'
+                                    'CHAT_ID BIGINT NOT NULL,'
+                                    'SUBJECTS TEXT[] NOT NULL,'
+                                    'DESCRIPTION TEXT,'
+                                    ')'))
+        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS SUBJECTS('
+                                    'ID BIGSERIAL PRIMARY KEY,'
+                                    'SUBJECT TEXT NOT NULL,'
+                                    'COUNT INT,'
+                                    ')'))
+        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS('
+                                    'ID BIGSERIAL PRIMARY KEY,'
+                                    'NAME TEXT NOT NULL,'
+                                    'CHAT_ID BIGINT NOT NULL,'
+                                    'SUBJECTS TEXT[],'
+                                    'LOAD INT'
+                                    'COURSE_WORKS BIGSERIAL[],'
+                                    ')'))
+        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS ADMINS('
+                                    'ID BIGSERIAL PRIMARY KEY,'
+                                    'CHAT_ID BIGINT NOT NULL'
+                                    ')'))
+        self.db.commit()
 
     # course works
+    async def add_subject(self, subj):
+        if await self.db.execute('SELECT EXISTS('
+                                 'SELECT * FROM SUBJECTS'
+                                 'WHERE SUBJECT=%s)', subj).fetchone()[0]:
+            create_task(self.db.execute('INSERT INTO SUBJECTS'
+                                        'VALUES(DEFAULT, %s, 1)', subj))
+        else:
+            create_task(self.db.execute('UPDATE SUBJECTS'
+                                        'SET COUNT = COUNT + 1'
+                                        'WHERE SUBJECT = %s', subj))
+
     async def add_course_work(self, line):
         """
         Adds a new course work to the database
@@ -43,9 +93,26 @@ class Database:
         DBAccessError whatever
         DBAlreadyExists
         """
-        raise NotImplementedError()
+        create_task(self.db.execute('INSERT INTO COURSE_WORKS VALUES('
+                                    'DEFAULT, %(name)s, %(chat_id)s,'
+                                    '%(subjects)s, %(description)s)', line))
+        for subj in line['subjects']:
+            await self.add_subject(subj)
+        await self.db.commit()
 
-    async def get_course_works(self, subjects):
+    async def assemble_courses_dict(cursor):
+        list = []
+        for i in cursor:
+            line = {
+                'name': i[1],
+                'chat_id': i[2],
+                'subjects': i[3],
+                'description': i[4]
+            }
+            list.append(line)
+        return list
+
+    async def get_course_works(self, subjects=[]):
         """
         Gets all submitted course works that satisfy the argument subject
         Subject may be empty, in this case, return all course works
@@ -65,7 +132,14 @@ class Database:
         iterable
             Iterable over all compliant lines (dict of columns excluding ID)
         """
-        raise NotImplementedError
+        if not subjects:
+            res = await self.db.execute('SELECT * FROM COURSE_WORKS').fetchall()
+            return await self.assemble_courses_dict(res)
+        else:
+            res = await self.db.execute('SELECT * FROM COURSE_WORKS'
+                                        'WHERE SUBJECTS = ANY(%s)',
+                                        (subjects,)).fetchall()
+            return await self.assemble_courses_dict(res)
 
     async def modify_course_work(self, line):
         """
@@ -82,7 +156,19 @@ class Database:
         DBAccessError whatever
         DBDoesNotExists
         """
-        raise NotImplementedError()
+        old = self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS'
+                              'WHERE CHAT_ID = %s', line['chat_id']).fetchone()[0]
+        for new in list(set(line['subjects']).difference(old)):
+            await self.add_subject(new)
+        for removed in list(set(old).difference(line['subjects'])):
+            create_task(self.db.execute('UPDATE SUBJECTS'
+                                        'SET COUNT = COUNT - 1'
+                                        'WHERE SUBJECT = %s', removed))
+        await self.db.execute('UPDATE COURSE_WORKS'
+                              'SET SUBJECTS = %(subjects)s,'
+                              'DESCRIPTION = %(description)s'
+                              'WHERE CHAT_ID = %(chat_id)s', line)
+        await self.db.commit()
 
     async def remove_course_work(self, id):
         """
@@ -98,7 +184,8 @@ class Database:
         ------
         DBAccessError whatever
         """
-        raise NotImplementedError()
+        await self.db.execute('DELETE FROM COURSE_WORKS'
+                              'WHERE CHAT_ID = %s', (id,))
 
     # accepted
     async def accept_work(self, mentor, work):
