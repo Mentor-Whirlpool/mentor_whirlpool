@@ -20,6 +20,6 @@ async def start(message):
     if message.chat.id in await db.get_admins():
         keyboard.add(*[types.KeyboardButton(task)
                        for task in await admin_start(message)])
-    bot.send_message(message.chat.id,
-                     'Ваши опции приведены в клавиатуре снизу:',
-                     reply_markup=keyboard, parse_mode='Html')
+    await bot.send_message(message.chat.id,
+                           'Ваши опции приведены в клавиатуре снизу:',
+                           reply_markup=keyboard, parse_mode='Html')
