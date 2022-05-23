@@ -1,8 +1,8 @@
 from telegram import bot
 from telebot import types
-from database import db
+from database import Database
 from asyncio import create_task
-from common import confirm
+from confirm import confirm
 
 
 async def admin_start(message):

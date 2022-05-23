@@ -1,6 +1,6 @@
 from telegram import bot
 from telebot import types
-from common import confirm
+from confirm import confirm
 # from gettext import translation
 
 # strings = translation('mentor', localedir='locales', languages=['RU']).gettext
