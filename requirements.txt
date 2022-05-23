@@ -1,2 +1,3 @@
 pyTelegramBotAPI
 asyncio
+psycopg[c]
