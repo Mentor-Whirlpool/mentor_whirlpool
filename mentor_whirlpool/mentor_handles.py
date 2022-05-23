@@ -1,6 +1,8 @@
 from telegram import bot
 from telebot import types
 from confirm import confirm
+
+
 # from gettext import translation
 
 # strings = translation('mentor', localedir='locales', languages=['RU']).gettext
@@ -21,6 +23,15 @@ async def mentor_start(message):
     iterable
         Iterable with all handles texts
     """
+
+    markup = types.ReplyKeyboardMarkup(row_width=2)
+    btn_course_works = types.KeyboardButton('Курсовые')
+    btn_subjects = types.KeyboardButton('Темы')
+    btn_my_subjects = types.KeyboardButton('Мои темы')
+    btn_add_subtr_subject = types.KeyboardButton('Установить темы')
+
+    markup.add(btn_course_works, btn_subjects, btn_my_subjects, btn_add_subtr_subject)
+    await bot.send_message(message.chat.id, 'Что делать?', reply_markup=markup)
     raise NotImplementedError
 
 
@@ -38,6 +49,11 @@ async def works(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
+    course_works = ['course1', 'course2', 'course3',
+                    'course4']  # test without db.get_course_works()
+    markup = types.ReplyKeyboardMarkup(row_width=3)
+    markup.add(*[types.KeyboardButton(x) for x in course_works])
+    await bot.send_message(message.chat.id, 'Курсовые', reply_markup=markup)
     raise NotImplementedError
 
 
@@ -56,6 +72,11 @@ async def subjects(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
+    course_works = ['theme1', 'theme2', 'theme3',
+                    'theme4']  # test without db.subjects()
+    markup = types.ReplyKeyboardMarkup(row_width=3)
+    markup.add(*[types.KeyboardButton(x) for x in course_works])
+    await bot.send_message(message.chat.id, 'Темы', reply_markup=markup)
     raise NotImplementedError
 
 
@@ -75,6 +96,11 @@ async def my_subjects(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
+    course_works = ['my_theme1', 'my_theme2', 'my_theme3',
+                    'my_theme4']  # test without db.subjects()
+    markup = types.ReplyKeyboardMarkup(row_width=3)
+    markup.add(*[types.KeyboardButton(x) for x in course_works])
+    await bot.send_message(message.chat.id, 'Мои темы', reply_markup=markup)
     raise NotImplementedError
 
 
