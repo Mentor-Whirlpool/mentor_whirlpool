@@ -1,5 +1,5 @@
 import psycopg
-from asyncio import create_task
+from asyncio import create_task, gather
 
 
 class Database:
@@ -38,37 +38,37 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS('
-                                    'ID BIGSERIAL PRIMARY KEY,'
-                                    'NAME TEXT NOT NULL,'
-                                    'CHAT_ID BIGINT NOT NULL,'
-                                    'SUBJECTS TEXT[] NOT NULL,'
-                                    'DESCRIPTION TEXT'
-                                    ')'))
-        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS ACCEPTED('
-                                    'ID BIGSERIAL PRIMARY KEY,'
-                                    'NAME TEXT NOT NULL,'
-                                    'CHAT_ID BIGINT NOT NULL,'
-                                    'SUBJECTS TEXT[] NOT NULL,'
-                                    'DESCRIPTION TEXT'
-                                    ')'))
-        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS SUBJECTS('
-                                    'ID BIGSERIAL PRIMARY KEY,'
-                                    'SUBJECT TEXT NOT NULL,'
-                                    'COUNT INT'
-                                    ')'))
-        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS('
-                                    'ID BIGSERIAL PRIMARY KEY,'
-                                    'NAME TEXT NOT NULL,'
-                                    'CHAT_ID BIGINT NOT NULL,'
-                                    'SUBJECTS TEXT[],'
-                                    'LOAD INT,'
-                                    'COURSE_WORKS BIGINT[]'
-                                    ')'))
-        create_task(self.db.execute('CREATE TABLE IF NOT EXISTS ADMINS('
-                                    'ID BIGSERIAL PRIMARY KEY,'
-                                    'CHAT_ID BIGINT NOT NULL'
-                                    ')'))
+        await gather(self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'NAME TEXT NOT NULL,'
+                                     'CHAT_ID BIGINT NOT NULL,'
+                                     'SUBJECTS TEXT[] NOT NULL,'
+                                     'DESCRIPTION TEXT'
+                                     ')'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS ACCEPTED('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'NAME TEXT NOT NULL,'
+                                     'CHAT_ID BIGINT NOT NULL,'
+                                     'SUBJECTS TEXT[] NOT NULL,'
+                                     'DESCRIPTION TEXT'
+                                     ')'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS SUBJECTS('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'SUBJECT TEXT NOT NULL,'
+                                     'COUNT INT'
+                                     ')'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'NAME TEXT NOT NULL,'
+                                     'CHAT_ID BIGINT NOT NULL,'
+                                     'SUBJECTS TEXT[],'
+                                     'LOAD INT,'
+                                     'COURSE_WORKS BIGINT[]'
+                                     ')'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS ADMINS('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'CHAT_ID BIGINT NOT NULL'
+                                     ')'))
         await self.db.commit()
 
     # course works
@@ -78,12 +78,12 @@ class Database:
         if await self.db.execute('SELECT EXISTS('
                                  'SELECT * FROM SUBJECTS'
                                  'WHERE SUBJECT=%s)', subj).fetchone()[0]:
-            create_task(self.db.execute('INSERT INTO SUBJECTS'
-                                        'VALUES(DEFAULT, %s, 1)', subj))
+            await self.db.execute('INSERT INTO SUBJECTS'
+                                  'VALUES(DEFAULT, %s, 1)', subj)
         else:
-            create_task(self.db.execute('UPDATE SUBJECTS'
-                                        'SET COUNT = COUNT + 1'
-                                        'WHERE SUBJECT = %s', subj))
+            await self.db.execute('UPDATE SUBJECTS'
+                                  'SET COUNT = COUNT + 1'
+                                  'WHERE SUBJECT = %s', subj)
 
     async def add_course_work(self, line):
         """
@@ -103,11 +103,13 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        create_task(self.db.execute('INSERT INTO COURSE_WORKS VALUES('
-                                    'DEFAULT, %(name)s, %(chat_id)s,'
-                                    '%(subjects)s, %(description)s)', line))
+        tasks = []
+        tasks.append(self.db.execute('INSERT INTO COURSE_WORKS VALUES('
+                                     'DEFAULT, %(name)s, %(chat_id)s,'
+                                     '%(subjects)s, %(description)s)', line))
         for subj in line['subjects']:
-            await self.add_subject(subj)
+            subj.append(self.add_subject(subj))
+        await gather(tasks)
         await self.db.commit()
 
     async def assemble_courses_dict(cursor):
@@ -170,18 +172,21 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        old = self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS'
-                              'WHERE CHAT_ID = %s', line['chat_id']).fetchone()[0]
+        old = await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS'
+                                    'WHERE CHAT_ID = %s',
+                                    line['chat_id']).fetchone()[0]
+        tasks = []
         for new in list(set(line['subjects']).difference(old)):
-            await self.add_subject(new)
+            tasks.append(self.add_subject(new))
         for removed in list(set(old).difference(line['subjects'])):
-            create_task(self.db.execute('UPDATE SUBJECTS'
-                                        'SET COUNT = COUNT - 1'
-                                        'WHERE SUBJECT = %s', removed))
-        await self.db.execute('UPDATE COURSE_WORKS'
-                              'SET SUBJECTS = %(subjects)s,'
-                              'DESCRIPTION = %(description)s'
-                              'WHERE CHAT_ID = %(chat_id)s', line)
+            tasks.append(self.db.execute('UPDATE SUBJECTS'
+                                         'SET COUNT = COUNT - 1'
+                                         'WHERE SUBJECT = %s', removed))
+        tasks.append(self.db.execute('UPDATE COURSE_WORKS'
+                                     'SET SUBJECTS = %(subjects)s,'
+                                     'DESCRIPTION = %(description)s'
+                                     'WHERE CHAT_ID = %(chat_id)s', line))
+        await gather(tasks)
         await self.db.commit()
 
     async def remove_course_work(self, id):
