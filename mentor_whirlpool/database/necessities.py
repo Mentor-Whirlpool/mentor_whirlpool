@@ -75,9 +75,9 @@ class Database:
     async def add_subject(self, subj):
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        if await self.db.execute('SELECT EXISTS('
-                                 'SELECT * FROM SUBJECTS'
-                                 'WHERE SUBJECT=%s)', subj).fetchone()[0]:
+        if await (await self.db.execute()('SELECT EXISTS('
+                                          'SELECT * FROM SUBJECTS'
+                                          'WHERE SUBJECT=%s)', subj)).fetchone()[0]:
             await self.db.execute('INSERT INTO SUBJECTS'
                                   'VALUES(DEFAULT, %s, 1)', subj)
         else:
@@ -147,12 +147,12 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         if not subjects:
-            res = await self.db.execute('SELECT * FROM COURSE_WORKS').fetchall()
+            res = await (await self.db.execute('SELECT * FROM COURSE_WORKS')).fetchall()
             return await self.assemble_courses_dict(res)
         else:
-            res = await self.db.execute('SELECT * FROM COURSE_WORKS'
-                                        'WHERE SUBJECTS = ANY(%s)',
-                                        (subjects,)).fetchall()
+            res = await (await self.db.execute('SELECT * FROM COURSE_WORKS'
+                                               'WHERE SUBJECTS = ANY(%s)',
+                                               (subjects,))).fetchall()
             return await self.assemble_courses_dict(res)
 
     async def modify_course_work(self, line):
@@ -172,9 +172,9 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        old = await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS'
-                                    'WHERE CHAT_ID = %s',
-                                    line['chat_id']).fetchone()[0]
+        old = await (await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS'
+                                           'WHERE CHAT_ID = %s',
+                                           line['chat_id'])).fetchone()[0]
         tasks = []
         for new in list(set(line['subjects']).difference(old)):
             tasks.append(self.add_subject(new))
@@ -222,10 +222,10 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        line = await self.db.execute('SELECT * FROM COURSE_WORKS'
-                                     'WHERE NAME = %(name)s AND '
-                                     'CHAT_ID = %(chat_id)s AND '
-                                     'DESCRIPTION = %(chat_id)s').fetchone()
+        line = await (await self.db.execute('SELECT * FROM COURSE_WORKS'
+                                            'WHERE NAME = %(name)s AND '
+                                            'CHAT_ID = %(chat_id)s AND '
+                                            'DESCRIPTION = %(chat_id)s')).fetchone()
         await self.db.execute('INSERT INTO ACCEPTED VALUES('
                               'DEFAULT, %s, %s, %s, %s)', line[1:]) # probably bad (not comma ended)
         await self.db.execute('DELETE FROM COURSE_WORKS'
@@ -262,7 +262,7 @@ class Database:
         await gather(tasks)
         await self.db.commit()
 
-    async def assemble_mentors_dict(cursor):
+    async def assemble_mentors_dict(self, cursor):
         list = []
         for i in cursor:
             line = {
@@ -286,7 +286,7 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        mentors = await self.db.execute('SELECT * FROM MENTORS').fetchall()
+        mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
         return await self.assemble_mentors_dict(mentors)
 
     async def remove_mentor(self, chat_id):
