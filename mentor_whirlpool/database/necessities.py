@@ -62,8 +62,8 @@ class Database:
                                     'NAME TEXT NOT NULL,'
                                     'CHAT_ID BIGINT NOT NULL,'
                                     'SUBJECTS TEXT[],'
-                                    'LOAD INT'
-                                    'COURSE_WORKS BIGSERIAL[]'
+                                    'LOAD INT,'
+                                    'COURSE_WORKS BIGINT[]'
                                     ')'))
         create_task(self.db.execute('CREATE TABLE IF NOT EXISTS ADMINS('
                                     'ID BIGSERIAL PRIMARY KEY,'
