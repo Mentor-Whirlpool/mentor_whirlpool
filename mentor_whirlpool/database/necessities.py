@@ -222,10 +222,10 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        line = await self.db.execute('SELECT * FROM COURSE_WORKS'
-                                     'WHERE NAME = %(name)s AND '
-                                     'CHAT_ID = %(chat_id)s AND '
-                                     'DESCRIPTION = %(chat_id)s').fetchone()
+        line = await (await self.db.execute('SELECT * FROM COURSE_WORKS'
+                                            'WHERE NAME = %(name)s AND '
+                                            'CHAT_ID = %(chat_id)s AND '
+                                            'DESCRIPTION = %(chat_id)s')).fetchone()
         await self.db.execute('INSERT INTO ACCEPTED VALUES('
                               'DEFAULT, %s, %s, %s, %s)', line[1:]) # probably bad (not comma ended)
         await self.db.execute('DELETE FROM COURSE_WORKS'
@@ -262,7 +262,7 @@ class Database:
         await gather(tasks)
         await self.db.commit()
 
-    async def assemble_mentors_dict(cursor):
+    async def assemble_mentors_dict(self, cursor):
         list = []
         for i in cursor:
             line = {
@@ -286,7 +286,7 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        mentors = await self.db.execute('SELECT * FROM MENTORS').fetchall()
+        mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
         return await self.assemble_mentors_dict(mentors)
 
     async def remove_mentor(self, chat_id):
