@@ -10,7 +10,10 @@ import generic_handles
 import mentor_handles
 import admin_handles
 
-db = Database()
-db.initdb()
 
-run(bot.polling())
+async def main():
+    db = Database()
+    await db.initdb()
+    await bot.polling()
+
+run(main())
