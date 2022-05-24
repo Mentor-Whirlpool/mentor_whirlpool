@@ -6,6 +6,11 @@ class Database:
     # init
     def __init__(self):
         self.db = None
+        self.conn_opts = ('dbname=mentor_whirlpool '
+                          'user=postgres '
+                          'host=localhost '
+                          'port=5432 '
+                          'password=s3cret')
 
     async def initdb(self):
         """
@@ -32,8 +37,7 @@ class Database:
         ID(PRIMARY KEY) | CHAT_ID (BIGINT / at least 52 bits NOT NULL)
         """
         if self.db is None:
-            self.db = await psycopg.AsyncConnection.connect('dbname=mentor_whirlpool '
-                                                            'user=postgres')
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         create_task(self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS('
                                     'ID BIGSERIAL PRIMARY KEY,'
                                     'NAME TEXT NOT NULL,'
@@ -70,8 +74,7 @@ class Database:
     # course works
     async def add_subject(self, subj):
         if self.db is None:
-            self.db = await psycopg.AsyncConnection.connect('dbname=mentor_whirlpool '
-                                                            'user=postgres')
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         if await self.db.execute('SELECT EXISTS('
                                  'SELECT * FROM SUBJECTS'
                                  'WHERE SUBJECT=%s)', subj).fetchone()[0]:
@@ -99,8 +102,7 @@ class Database:
         DBAlreadyExists
         """
         if self.db is None:
-            self.db = await psycopg.AsyncConnection.connect('dbname=mentor_whirlpool '
-                                                            'user=postgres')
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         create_task(self.db.execute('INSERT INTO COURSE_WORKS VALUES('
                                     'DEFAULT, %(name)s, %(chat_id)s,'
                                     '%(subjects)s, %(description)s)', line))
@@ -141,8 +143,7 @@ class Database:
             Iterable over all compliant lines (dict of columns excluding ID)
         """
         if self.db is None:
-            self.db = await psycopg.AsyncConnection.connect('dbname=mentor_whirlpool '
-                                                            'user=postgres')
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         if not subjects:
             res = await self.db.execute('SELECT * FROM COURSE_WORKS').fetchall()
             return await self.assemble_courses_dict(res)
@@ -168,8 +169,7 @@ class Database:
         DBDoesNotExists
         """
         if self.db is None:
-            self.db = await psycopg.AsyncConnection.connect('dbname=mentor_whirlpool '
-                                                            'user=postgres')
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         old = self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS'
                               'WHERE CHAT_ID = %s', line['chat_id']).fetchone()[0]
         for new in list(set(line['subjects']).difference(old)):
@@ -199,8 +199,7 @@ class Database:
         DBAccessError whatever
         """
         if self.db is None:
-            self.db = await psycopg.AsyncConnection.connect('dbname=mentor_whirlpool '
-                                                            'user=postgres')
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('DELETE FROM COURSE_WORKS'
                               'WHERE CHAT_ID = %s', (id,))
 
