@@ -289,7 +289,11 @@ class Database:
         DBAccessError whatever
         DBAlreadyExists
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('INSERT INTO ADMINS VALUES('
+                              'DEFAULT, %s,', chat_id)
+        await self.db.commit()
 
     async def get_admins(self):
         """
@@ -300,15 +304,18 @@ class Database:
         iterable
             Iterable over all subjects (str's)
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        cur = await (await self.db.execute('SELECT * FROM ADMINS')).fetchall()
+        return *[adm[1] for adm in cur]
 
-    async def remove_admin(self, id):
+    async def remove_admin(self, chat_id):
         """
         Removes a line from ADMINS table
 
         Parameters
         ----------
-        id : int
+        chat_id : int
             The first column of the table
 
         Raises
@@ -316,4 +323,8 @@ class Database:
         DBAccessError whatever
         DBDoesNotExist
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('DELETE FROM ADMINS'
+                              'WHERE CHAT_ID = %s', (chat_id,))
+        await self.db.commit()
