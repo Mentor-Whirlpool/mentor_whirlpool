@@ -318,7 +318,10 @@ class Database:
         iterable
             Iterable over all subjects (str's)
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        cur = await (await self.db.execute('SELECT * FROM SUBJECTS')).fetchall()
+        return *[subj[1] for subj in cur]
 
     # admin
     async def add_admin(self, chat_id):
