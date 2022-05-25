@@ -108,7 +108,7 @@ class Database:
                                      'DEFAULT, %(name)s, %(chat_id)s,'
                                      '%(subjects)s, %(description)s)', line))
         for subj in line['subjects']:
-            subj.append(self.add_subject(subj))
+            tasks.append(self.add_subject(subj))
         await gather(tasks)
         await self.db.commit()
 
@@ -220,7 +220,19 @@ class Database:
         DBDoesNotExist
         DBAlreadyExists
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        line = await (await self.db.execute('SELECT * FROM COURSE_WORKS'
+                                            'WHERE NAME = %(name)s AND '
+                                            'CHAT_ID = %(chat_id)s AND '
+                                            'DESCRIPTION = %(chat_id)s')).fetchone()
+        await self.db.execute('INSERT INTO ACCEPTED VALUES('
+                              'DEFAULT, %s, %s, %s, %s)', line[1:]) # probably bad (not comma ended)
+        await self.db.execute('DELETE FROM COURSE_WORKS'
+                              'WHERE NAME = %(name)s AND '
+                              'CHAT_ID = %(chat_id)s AND '
+                              'DESCRIPTION = %(chat_id)s')
+        await self.db.commit()
 
     # mentor
     async def add_mentor(self, line):
@@ -238,7 +250,30 @@ class Database:
         DBAccessError whatever
         DBAlreadyExists
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        tasks = []
+        tasks.append(self.db.execute('INSERT INTO MENTORS VALUES('
+                                     'DEFAULT, %(name)s, %(chat_id)s,'
+                                     '%(subjects)s, 0, NULL)', line))
+        if line['subjects'] is not None:
+            for subj in line['subjects']:
+                tasks.append(self.add_subject(subj))
+        await gather(tasks)
+        await self.db.commit()
+
+    async def assemble_mentors_dict(self, cursor):
+        list = []
+        for i in cursor:
+            line = {
+                'name': i[1],
+                'chat_id': i[2],
+                'subjects': i[3],
+                'load': i[4],
+                'course_works': i[5]
+            }
+            list.append(line)
+        return list
 
     async def get_mentors(self):
         """
@@ -249,23 +284,29 @@ class Database:
         iterable
             Iterable over all mentors (dict of columns excluding ID)
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
+        return await self.assemble_mentors_dict(mentors)
 
-    async def remove_mentor(self, id):
+    async def remove_mentor(self, chat_id):
         """
         Removes a line from MENTORS table
 
         Parameters
         ----------
-        id : int
-            The first column of the table
+        chat_id : int
+            Chat_id of mentor to delete
 
         Raises
         ------
         DBAccessError whatever
         DBDoesNotExist
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('DELETE FROM MENTORS'
+                              'WHERE CHAT_ID = %s', (chat_id,))
 
     # subjects
     async def get_subjects(self):
@@ -277,7 +318,10 @@ class Database:
         iterable
             Iterable over all subjects (str's)
         """
-        raise NotImplementedError
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        cur = await (await self.db.execute('SELECT * FROM SUBJECTS')).fetchall()
+        return *[subj[1] for subj in cur]
 
     # admin
     async def add_admin(self, chat_id):
