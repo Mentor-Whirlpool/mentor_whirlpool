@@ -1,7 +1,7 @@
 from telegram import bot
 from telebot import types
 from confirm import confirm
-
+from database.necessities import Database
 
 # from gettext import translation
 
@@ -42,10 +42,11 @@ async def works(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
-    course_works = ['course1', 'course2', 'course3',
-                    'course4']  # test without db.get_course_works()
-    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
-    markup.add(*[types.KeyboardButton(x) for x in course_works])
+    db = Database()
+    course_works = await db.get_course_works()
+    # course_works = ['the1', 'the2', 'the3', 'the4']
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(*[types.InlineKeyboardButton(x, callback_data=x) for x in course_works])
     await bot.send_message(message.chat.id, 'Курсовые', reply_markup=markup)
     raise NotImplementedError
 
@@ -65,10 +66,10 @@ async def subjects(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
-    course_works = ['theme1', 'theme2', 'theme3',
-                    'theme4']  # test without db.subjects()
-    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
-    markup.add(*[types.KeyboardButton(x) for x in course_works])
+    db = Database()
+    subjects_ = await db.get_subjects()
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(*[types.InlineKeyboardButton(x, callback_data=x) for x in subjects_])
     await bot.send_message(message.chat.id, 'Темы', reply_markup=markup)
     raise NotImplementedError
 
@@ -89,10 +90,15 @@ async def my_subjects(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
-    course_works = ['my_theme1', 'my_theme2', 'my_theme3',
-                    'my_theme4']  # test without db.subjects()
-    markup = types.ReplyKeyboardMarkup(row_width=3, resize_keyboard=True)
-    markup.add(*[types.KeyboardButton(x) for x in course_works])
+    db = Database()
+    my_subjects_ = []
+    for mentor in await db.get_mentors():
+        if mentor['chat_id'] == message.from_user.id:
+            my_subjects_ = mentor['subjects']
+            break
+
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(*[types.InlineKeyboardButton(x, callback_data=x) for x in my_subjects_])
     await bot.send_message(message.chat.id, 'Мои темы', reply_markup=markup)
     raise NotImplementedError
 
