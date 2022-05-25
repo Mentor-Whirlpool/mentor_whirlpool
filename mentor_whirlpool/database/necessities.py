@@ -112,7 +112,7 @@ class Database:
         await gather(tasks)
         await self.db.commit()
 
-    async def assemble_courses_dict(cursor):
+    async def assemble_courses_dict(self, cursor):
         list = []
         for i in cursor:
             line = {
