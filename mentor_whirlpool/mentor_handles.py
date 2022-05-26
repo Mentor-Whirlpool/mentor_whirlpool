@@ -24,12 +24,12 @@ async def mentor_start(message):
     iterable
         Iterable with all handles texts
     """
-
-    return ['Курсовые', 'Темы', 'Мои темы', 'Установить темы']
+    # курсовые  = мои студенты
+    return ['Запросы', 'Мои темы', 'Мои студенты']
     raise NotImplementedError
 
 
-@bot.message_handler(func=lambda msg: msg.text == 'Курсовые')
+@bot.message_handler(func=lambda msg: msg.text == 'Запросы')
 async def works(message):
     """
     Should send a list of inline buttons from db.get_course_works()
@@ -44,30 +44,36 @@ async def works(message):
         A pyTelegramBotAPI Message type class
     """
     db = Database()
-    course_works = [work['name'] for work in await db.get_course_works()]
-    # course_works = [work['name'] for work in[{
+    course_works = await db.get_course_works()
+    # course_works = [{
     #     'name': 'w1',
+    #     'chat_id': 'id1',
     #     'description': 'd1'
     # }, {
     #     'name': 'w2',
+    #     'chat_id': 'id2',
     #     'description': 'd2'
     # }, {
     #     'name': 'w3',
+    #     'chat_id': 'id3',
     #     'description': 'd3'
     # }, {
     #     'name': 'w4',
+    #     'chat_id': 'id4',
     #     'description': 'd4'
-    # }, ]]
-    markup = types.InlineKeyboardMarkup(row_width=3)
-    markup.add(*[types.InlineKeyboardButton(x, callback_data=x) for x in course_works])
-    await bot.send_message(message.chat.id, 'Курсовые', reply_markup=markup)
+    # }, ]
+    for work in course_works:
+        markup = types.InlineKeyboardMarkup()
+        markup.add(types.InlineKeyboardButton('Выбрать', callback_data=work['name']))
+        await bot.send_message(message.chat.id, f'*{work["name"]}* | {work["chat_id"]}\n{work["description"]}',
+                               reply_markup=markup,
+                               parse_mode='markdown')
     raise NotImplementedError
 
 
 @bot.callback_query_handler(func=lambda call: True)
 async def callback_query_work(call):
-    db = Database()
-    description = ''
+    pass
     # course_works = [{
     #     'name': 'w1',
     #     'description': 'd1'
@@ -81,13 +87,6 @@ async def callback_query_work(call):
     #     'name': 'w4',
     #     'description': 'd4'
     # }, ]
-    for work in await db.get_course_works():
-    # for work in course_works:
-        if work['name'] == call.data:
-            description = work['description']
-            break
-
-    await bot.answer_callback_query(call.id, description, show_alert=True)
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Темы')
