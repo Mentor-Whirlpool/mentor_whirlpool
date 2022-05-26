@@ -1,5 +1,5 @@
 import psycopg
-from asyncio import create_task, gather
+from asyncio import create_task, gather, run
 
 
 class Database:
@@ -41,26 +41,26 @@ class Database:
         await gather(self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
-                                     'CHAT_ID BIGINT NOT NULL,'
+                                     'CHAT_ID BIGINT NOT NULL UNIQUE,'
                                      'SUBJECTS TEXT[] NOT NULL,'
                                      'DESCRIPTION TEXT'
                                      ')'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS ACCEPTED('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
-                                     'CHAT_ID BIGINT NOT NULL,'
+                                     'CHAT_ID BIGINT NOT NULL UNIQUE,'
                                      'SUBJECTS TEXT[] NOT NULL,'
                                      'DESCRIPTION TEXT'
                                      ')'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS SUBJECTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
-                                     'SUBJECT TEXT NOT NULL,'
+                                     'SUBJECT TEXT NOT NULL UNIQUE,'
                                      'COUNT INT'
                                      ')'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
-                                     'CHAT_ID BIGINT NOT NULL,'
+                                     'CHAT_ID BIGINT NOT NULL UNIQUE,'
                                      'SUBJECTS TEXT[],'
                                      'LOAD INT,'
                                      'COURSE_WORKS BIGINT[]'
@@ -75,15 +75,11 @@ class Database:
     async def add_subject(self, subj):
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        if await (await self.db.execute()('SELECT EXISTS('
-                                          'SELECT * FROM SUBJECTS'
-                                          'WHERE SUBJECT=%s)', subj)).fetchone()[0]:
-            await self.db.execute('INSERT INTO SUBJECTS'
-                                  'VALUES(DEFAULT, %s, 1)', subj)
-        else:
-            await self.db.execute('UPDATE SUBJECTS'
-                                  'SET COUNT = COUNT + 1'
-                                  'WHERE SUBJECT = %s', subj)
+        await self.db.execute('INSERT INTO SUBJECTS(SUBJECT, COUNT) '
+                              'VALUES(%s, 1) '
+                              'ON CONFLICT (SUBJECT) DO '
+                              'UPDATE SET COUNT = EXCLUDED.COUNT + 1', (subj,))
+        await self.db.commit()
 
     async def add_course_work(self, line):
         """
@@ -104,12 +100,12 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         tasks = []
-        tasks.append(self.db.execute('INSERT INTO COURSE_WORKS VALUES('
-                                     'DEFAULT, %(name)s, %(chat_id)s,'
+        tasks.append(self.db.execute('INSERT INTO COURSE_WORKS VALUES( '
+                                     'DEFAULT, %(name)s, %(chat_id)s, '
                                      '%(subjects)s, %(description)s)', line))
         for subj in line['subjects']:
             tasks.append(self.add_subject(subj))
-        await gather(tasks)
+        await gather(*tasks)
         await self.db.commit()
 
     async def assemble_courses_dict(self, cursor):
@@ -150,7 +146,7 @@ class Database:
             res = await (await self.db.execute('SELECT * FROM COURSE_WORKS')).fetchall()
             return await self.assemble_courses_dict(res)
         else:
-            res = await (await self.db.execute('SELECT * FROM COURSE_WORKS'
+            res = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                                'WHERE SUBJECTS = ANY(%s)',
                                                (subjects,))).fetchall()
             return await self.assemble_courses_dict(res)
@@ -172,21 +168,21 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        old = await (await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS'
+        old = await (await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS '
                                            'WHERE CHAT_ID = %s',
                                            line['chat_id'])).fetchone()[0]
         tasks = []
         for new in list(set(line['subjects']).difference(old)):
             tasks.append(self.add_subject(new))
         for removed in list(set(old).difference(line['subjects'])):
-            tasks.append(self.db.execute('UPDATE SUBJECTS'
-                                         'SET COUNT = COUNT - 1'
+            tasks.append(self.db.execute('UPDATE SUBJECTS '
+                                         'SET COUNT = COUNT - 1 '
                                          'WHERE SUBJECT = %s', removed))
-        tasks.append(self.db.execute('UPDATE COURSE_WORKS'
-                                     'SET SUBJECTS = %(subjects)s,'
-                                     'DESCRIPTION = %(description)s'
+        tasks.append(self.db.execute('UPDATE COURSE_WORKS '
+                                     'SET SUBJECTS = %(subjects)s, '
+                                     'DESCRIPTION = %(description)s '
                                      'WHERE CHAT_ID = %(chat_id)s', line))
-        await gather(tasks)
+        await gather(*tasks)
         await self.db.commit()
 
     async def remove_course_work(self, id):
@@ -205,8 +201,9 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('DELETE FROM COURSE_WORKS'
+        await self.db.execute('DELETE FROM COURSE_WORKS '
                               'WHERE CHAT_ID = %s', (id,))
+        await self.db.commit()
 
     # accepted
     async def accept_work(self, mentor, work):
@@ -222,13 +219,13 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        line = await (await self.db.execute('SELECT * FROM COURSE_WORKS'
+        line = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                             'WHERE NAME = %(name)s AND '
                                             'CHAT_ID = %(chat_id)s AND '
                                             'DESCRIPTION = %(chat_id)s')).fetchone()
         await self.db.execute('INSERT INTO ACCEPTED VALUES('
                               'DEFAULT, %s, %s, %s, %s)', line[1:]) # probably bad (not comma ended)
-        await self.db.execute('DELETE FROM COURSE_WORKS'
+        await self.db.execute('DELETE FROM COURSE_WORKS '
                               'WHERE NAME = %(name)s AND '
                               'CHAT_ID = %(chat_id)s AND '
                               'DESCRIPTION = %(chat_id)s')
@@ -259,7 +256,7 @@ class Database:
         if line['subjects'] is not None:
             for subj in line['subjects']:
                 tasks.append(self.add_subject(subj))
-        await gather(tasks)
+        await gather(*tasks)
         await self.db.commit()
 
     async def assemble_mentors_dict(self, cursor):
@@ -305,7 +302,7 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('DELETE FROM MENTORS'
+        await self.db.execute('DELETE FROM MENTORS '
                               'WHERE CHAT_ID = %s', (chat_id,))
 
     # subjects
@@ -321,7 +318,7 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         cur = await (await self.db.execute('SELECT * FROM SUBJECTS')).fetchall()
-        return *[subj[1] for subj in cur]
+        return [subj[1] for subj in cur]
 
     # admin
     async def add_admin(self, chat_id):
@@ -351,7 +348,7 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         cur = await (await self.db.execute('SELECT * FROM ADMINS')).fetchall()
-        return *[adm[1] for adm in cur]
+        return [adm[1] for adm in cur]
 
     async def remove_admin(self, chat_id):
         """
@@ -369,6 +366,6 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('DELETE FROM ADMINS'
+        await self.db.execute('DELETE FROM ADMINS '
                               'WHERE CHAT_ID = %s', (chat_id,))
         await self.db.commit()
