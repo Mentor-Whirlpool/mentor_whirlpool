@@ -87,7 +87,7 @@ async def callback_query_work(call):
             description = work['description']
             break
 
-    await bot.send_message(call.message.chat.id, description)
+    await bot.answer_callback_query(call.id, description, show_alert=True)
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Темы')
