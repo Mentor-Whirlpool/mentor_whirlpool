@@ -3,6 +3,7 @@ from telebot import types
 from confirm import confirm
 from database.necessities import Database
 
+
 # from gettext import translation
 
 # strings = translation('mentor', localedir='locales', languages=['RU']).gettext
@@ -43,12 +44,50 @@ async def works(message):
         A pyTelegramBotAPI Message type class
     """
     db = Database()
-    course_works = await db.get_course_works()
-    # course_works = ['the1', 'the2', 'the3', 'the4']
+    course_works = [work['name'] for work in await db.get_course_works()]
+    # course_works = [work['name'] for work in[{
+    #     'name': 'w1',
+    #     'description': 'd1'
+    # }, {
+    #     'name': 'w2',
+    #     'description': 'd2'
+    # }, {
+    #     'name': 'w3',
+    #     'description': 'd3'
+    # }, {
+    #     'name': 'w4',
+    #     'description': 'd4'
+    # }, ]]
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(*[types.InlineKeyboardButton(x, callback_data=x) for x in course_works])
     await bot.send_message(message.chat.id, 'Курсовые', reply_markup=markup)
     raise NotImplementedError
+
+
+@bot.callback_query_handler(func=lambda call: True)
+async def callback_query_work(call):
+    db = Database()
+    description = ''
+    # course_works = [{
+    #     'name': 'w1',
+    #     'description': 'd1'
+    # }, {
+    #     'name': 'w2',
+    #     'description': 'd2'
+    # }, {
+    #     'name': 'w3',
+    #     'description': 'd3'
+    # }, {
+    #     'name': 'w4',
+    #     'description': 'd4'
+    # }, ]
+    for work in await db.get_course_works():
+    # for work in course_works:
+        if work['name'] == call.data:
+            description = work['description']
+            break
+
+    await bot.send_message(call.message.chat.id, description)
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Темы')
@@ -95,7 +134,6 @@ async def my_subjects(message):
     for mentor in await db.get_mentors():
         if mentor['chat_id'] == message.from_user.id:
             my_subjects_ = mentor['subjects']
-            break
 
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(*[types.InlineKeyboardButton(x, callback_data=x) for x in my_subjects_])
