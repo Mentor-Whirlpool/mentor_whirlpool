@@ -24,7 +24,6 @@ async def mentor_start(message):
     iterable
         Iterable with all handles texts
     """
-    # курсовые  = мои студенты
     return ['Запросы', 'Мои темы', 'Мои студенты']
     raise NotImplementedError
 
@@ -44,7 +43,12 @@ async def works(message):
         A pyTelegramBotAPI Message type class
     """
     db = Database()
-    course_works = await db.get_course_works()
+    my_subjects_ = []
+    for mentor in await db.get_mentors():
+        if mentor['chat_id'] == message.from_user.id:
+            my_subjects_ = mentor['subjects']
+            break
+    course_works = await db.get_course_works(my_subjects_)
     # course_works = [{
     #     'name': 'w1',
     #     'chat_id': 'id1',
@@ -64,16 +68,17 @@ async def works(message):
     # }, ]
     for work in course_works:
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('Выбрать', callback_data=work['name']))
+        markup.add(types.InlineKeyboardButton('Выбрать', callback_data='work_' + work['name']))
         await bot.send_message(message.chat.id, f'*{work["name"]}* | {work["chat_id"]}\n{work["description"]}',
                                reply_markup=markup,
                                parse_mode='markdown')
     raise NotImplementedError
 
 
-@bot.callback_query_handler(func=lambda call: True)
+@bot.callback_query_handler(func=lambda call: call.data.startswith('work_'))
 async def callback_query_work(call):
-    pass
+    await bot.answer_callback_query(call.id)
+
     # course_works = [{
     #     'name': 'w1',
     #     'description': 'd1'
@@ -129,15 +134,52 @@ async def my_subjects(message):
         A pyTelegramBotAPI Message type class
     """
     db = Database()
+    # my_subjects_ = ['sub1', 'sub2', 'sub3', 'sub4']
     my_subjects_ = []
     for mentor in await db.get_mentors():
         if mentor['chat_id'] == message.from_user.id:
             my_subjects_ = mentor['subjects']
+            break
 
     markup = types.InlineKeyboardMarkup(row_width=3)
-    markup.add(*[types.InlineKeyboardButton(x, callback_data=x) for x in my_subjects_])
-    await bot.send_message(message.chat.id, 'Мои темы', reply_markup=markup)
+    add = types.InlineKeyboardButton('Добавить', callback_data='sub_add')
+    delete = types.InlineKeyboardButton('Удалить', callback_data='sub_delete')
+    markup.row(add, delete)
+    markup.add(*[types.InlineKeyboardButton(subject, callback_data='subject_' + subject) for subject in my_subjects_])
+
+    await bot.send_message(message.chat.id, f'*Мои темы*', reply_markup=markup,
+                           parse_mode='markdown')
     raise NotImplementedError
+
+
+# мои темы получаешь еще кнопки с темам, тыкаешь на кнопку получаешь список курсачей по этой теме (тоже кнопками) -> жмешь на курсач и принимаешь его
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('subject_'))
+async def callback_show_course_works_by_subject(call):
+    db = Database()
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(*[types.InlineKeyboardButton(work, callback_data='work_' + work) for work in
+                 await db.get_course_works([call.data[8:]])]) # добавление курсачей будет в callback_query_work
+    await bot.answer_callback_query(call.id)
+    await bot.send_message(call.from_user.id, f'Курсовые работы по теме *{call.data[8:]}*', reply_markup=markup,
+                           parse_mode='markdown')
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'sub_add')
+async def callback_show_add_subject(call):
+    db = Database()
+    # subjects_ = await db.get_subjects()
+    subjects_ = ['sub1', 'sub2', 'sub3', 'sub4']
+    markup = types.InlineKeyboardMarkup()
+    markup.add(*[types.InlineKeyboardButton(subject, callback_data='s_add_' + subject) for subject in subjects_])
+    await bot.answer_callback_query(call.id)
+    await bot.send_message(call.from_user.id, '*Все темы*', reply_markup=markup, parse_mode='markdown')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('s_add_'))
+async def callback_add_subject(call):
+    await bot.answer_callback_query(call.id)
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Установить темы')
