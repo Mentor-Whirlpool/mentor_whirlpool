@@ -19,57 +19,75 @@ class Database:
         don't really care if it returns success
         as it is so essential, someone will notice eventually
             Structure shall be as follows:
-                Table "COURSE_WORKS":
+                Table "STUDENTS":
         ID(PRIMARY KEY) | NAME(TEXT NOT NULL) |
-        CHAT_ID(BIGINT / at least 52 bits NOT NULL) |
+        CHAT_ID(BIGINT NOT NULL UNIQUE) | COURSE_WORKS (BIGINT)
+                Table "COURSE_WORKS":
+        ID(PRIMARY KEY) | STUDENT(BIGINT NOT NULL) |
         SUBJECTS(TEXT[] NOT NULL) | DESCRIPTION(TEXT)
                 Table "ACCEPTED":
-        ID(PRIMARY KEY) | NAME(TEXT NOT NULL) |
-        CHAT_ID(BIGING / at least 52 bits NOT NULL) |
+        ID(PRIMARY KEY) | STUDENT(BIGINT NOT NULL UNIQUE) |
         SUBJECTS(TEXT[] NOT NULL) | DESCRIPTION(TEXT)
                 Table "SUBJECTS":
         ID(PRIMARY KEY) | SUBJECT(TEXT NOT NULL) | COUNT(INT)
                 Table "MENTORS":
         ID(PRIMARY KEY) | NAME(TEXT NOT NULL) |
-        CHAT_ID(BIGINT / at least 52 bits NOT NULL) | SUBJECTS(TEXT[]) |
-        LOAD(INT) | COURSE_WORKS (PRIMARY KEY[])
+        CHAT_ID(BIGINT NOT NULL) | SUBJECTS(TEXT[]) |
+        LOAD(INT) | STUDENTS (BIGINT[])
                 Table "ADMINS":
-        ID(PRIMARY KEY) | CHAT_ID (BIGINT / at least 52 bits NOT NULL)
+        ID(PRIMARY KEY) | CHAT_ID (BIGINT NOT NULL UNIQUE)
         """
         if self.db is None:
-            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await gather(self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS('
+            self.db = await psycopg.AsyncConnection.connectnect(self.conn_opts)
+        await gather(self.db.execute('CREATE TABLE IF NOT EXISTS STUDENTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
                                      'CHAT_ID BIGINT NOT NULL UNIQUE,'
+                                     'COURSE_WORKS BIGINT[])'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'STUDENT BIGINT NOT NULL,'
                                      'SUBJECTS TEXT[] NOT NULL,'
-                                     'DESCRIPTION TEXT'
-                                     ')'),
+                                     'DESCRIPTION TEXT)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS ACCEPTED('
                                      'ID BIGSERIAL PRIMARY KEY,'
-                                     'NAME TEXT NOT NULL,'
-                                     'CHAT_ID BIGINT NOT NULL UNIQUE,'
+                                     'STUDENT BIGINT NOT NULL UNIQUE,'
                                      'SUBJECTS TEXT[] NOT NULL,'
-                                     'DESCRIPTION TEXT'
-                                     ')'),
+                                     'DESCRIPTION TEXT)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS SUBJECTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'SUBJECT TEXT NOT NULL UNIQUE,'
-                                     'COUNT INT'
-                                     ')'),
+                                     'COUNT INT)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
                                      'CHAT_ID BIGINT NOT NULL UNIQUE,'
                                      'SUBJECTS TEXT[],'
                                      'LOAD INT,'
-                                     'COURSE_WORKS BIGINT[]'
-                                     ')'),
+                                     'STUDENTS BIGINT[])'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS ADMINS('
                                      'ID BIGSERIAL PRIMARY KEY,'
-                                     'CHAT_ID BIGINT NOT NULL'
-                                     ')'))
+                                     'CHAT_ID BIGINT NOT NULL UNIQUE)'))
         await self.db.commit()
+
+    # students
+    async def assemble_courses_dict(self, cursor):
+        list = []
+        for i in cursor:
+            line = {
+                'name': i[1],
+                'student': i[2],
+                'course_works': i[3],
+            }
+            list.append(line)
+        return list
+
+    async def get_students(self):
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        return await self.assemble_courses_dict(
+            await (await self.db.execute('SELECT * FROM STUDENTS')).fetchall()
+        )
 
     # course works
     async def add_subject(self, subj):
@@ -89,8 +107,7 @@ class Database:
         Parameters
         ----------
         line : dict
-            Dict field names are corresponding to COURSE_WORKS table column
-            lowercase names, types are corresponding
+            Dict with field names 'name', 'chat_id', 'subjects', 'description'
 
         Raises
         ------
@@ -100,25 +117,20 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         tasks = []
-        tasks.append(self.db.execute('INSERT INTO COURSE_WORKS VALUES( '
-                                     'DEFAULT, %(name)s, %(chat_id)s, '
-                                     '%(subjects)s, %(description)s)', line))
+        work = await self.db.execute('INSERT INTO COURSE_WORKS VALUES( '
+                                     'DEFAULT, %(chat_id)s, '
+                                     '%(subjects)s, %(description)s) '
+                                     'RETURNING ID', line)
+        tasks.append(self.db.execute('INSERT INTO STUDENTS VALUES('
+                                     'DEFAULT, %s, %s, %s) '
+                                     'ON CONFLICT (CHAT_ID, COURSE_WORKS) DO '
+                                     'UPDATE COURSE_WORKS = '
+                                     'ARRAY_APPEND(%s, EXCLUDED.COURSE_WORKS)',
+                                     (line['name'], line['chat_id'], work, work,)))
         for subj in line['subjects']:
             tasks.append(self.add_subject(subj))
         await gather(*tasks)
         await self.db.commit()
-
-    async def assemble_courses_dict(self, cursor):
-        list = []
-        for i in cursor:
-            line = {
-                'name': i[1],
-                'chat_id': i[2],
-                'subjects': i[3],
-                'description': i[4]
-            }
-            list.append(line)
-        return list
 
     async def get_course_works(self, subjects=[]):
         """
@@ -151,6 +163,30 @@ class Database:
                                                (subjects,))).fetchall()
             return await self.assemble_courses_dict(res)
 
+    async def get_student_course_works(self, chat_id):
+        """
+        Gets all submitted course works from a specified student
+
+        Parameters
+        ----------
+        chat_id : int
+            ID of a specific student
+
+        Raises
+        ------
+        DBAccessError whatever
+
+        Returns
+        ------
+        iterable
+            Iterable over all compliant lines (dict of columns excluding ID)
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        res = (await self.db.execute('SELECT * FROM COURSE_WORKS '
+                                     'WHERE STUDENT = %s', (chat_id,))).fetchall()
+        return await self.assemble_courses_dict(await res)
+
     async def modify_course_work(self, line):
         """
         Modifies an existing line in the database, matching 'chat_id' field
@@ -159,8 +195,7 @@ class Database:
         Parameters
         ----------
         line : dict
-            Dict field names are corresponding to COURSE_WORKS table column
-            lowercase names, types are corresponding
+            Dict field names are 'student': int, 'subjects': str[], 'desc': str
         Raises
         ------
         DBAccessError whatever
@@ -169,15 +204,15 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         old = await (await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS '
-                                           'WHERE CHAT_ID = %s',
-                                           line['chat_id'])).fetchone()[0]
+                                           'WHERE STUDENT = %(chat_id)s',
+                                           line)).fetchone()[0]
         tasks = []
         for new in list(set(line['subjects']).difference(old)):
             tasks.append(self.add_subject(new))
         for removed in list(set(old).difference(line['subjects'])):
             tasks.append(self.db.execute('UPDATE SUBJECTS '
                                          'SET COUNT = COUNT - 1 '
-                                         'WHERE SUBJECT = %s', removed))
+                                         'WHERE SUBJECT = %s', (removed,)))
         tasks.append(self.db.execute('UPDATE COURSE_WORKS '
                                      'SET SUBJECTS = %(subjects)s, '
                                      'DESCRIPTION = %(description)s '
@@ -203,6 +238,13 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('DELETE FROM COURSE_WORKS '
                               'WHERE CHAT_ID = %s', (id,))
+        student_relevant = (await (await self.db.execute('SELECT EXISTS('
+                                                         'SELECT * FROM COURSE_WORKS '
+                                                         'WHERE CHAT_ID = %s))',
+                                                         (id,))).fetchone())[0]
+        if not student_relevant:
+            await self.db.execute('DELETE FROM STUDENTS '
+                                  'WHERE CHAT_ID = %s', (id,))
         await self.db.commit()
 
     # accepted
@@ -220,15 +262,13 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         line = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
-                                            'WHERE NAME = %(name)s AND '
-                                            'CHAT_ID = %(chat_id)s AND '
-                                            'DESCRIPTION = %(chat_id)s')).fetchone()
+                                            'WHERE STUDENT = %(student)s AND '
+                                            'DESCRIPTION = %(student)s')).fetchone()
         await self.db.execute('INSERT INTO ACCEPTED VALUES('
-                              'DEFAULT, %s, %s, %s, %s)', line[1:]) # probably bad (not comma ended)
+                              'DEFAULT, %s, %s, %s)', line[1:]) # probably bad (not comma ended)
         await self.db.execute('DELETE FROM COURSE_WORKS '
-                              'WHERE NAME = %(name)s AND '
-                              'CHAT_ID = %(chat_id)s AND '
-                              'DESCRIPTION = %(chat_id)s')
+                              'WHERE STUDENT = %(student)s AND '
+                              'DESCRIPTION = %(student)s')
         await self.db.commit()
 
     # mentor
@@ -267,7 +307,7 @@ class Database:
                 'chat_id': i[2],
                 'subjects': i[3],
                 'load': i[4],
-                'course_works': i[5]
+                'students': i[5]
             }
             list.append(line)
         return list
