@@ -75,6 +75,7 @@ class Database:
         list = []
         for i in cursor:
             line = {
+                'id': i[0],
                 'name': i[1],
                 'student': i[2],
                 'course_works': i[3],
@@ -141,6 +142,7 @@ class Database:
         list = []
         for i in cursor:
             line = {
+                'id': i[0],
                 'student': i[1],
                 'subjects': i[2],
                 'description': i[3],
