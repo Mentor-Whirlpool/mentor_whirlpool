@@ -6,16 +6,10 @@ from database import Database
 
 # here will be handles importing
 import common
-import generic_handles
+import students_handles
 import mentor_handles
 import admin_handles
 import support_handles
 import support_request_handler
 
-
-async def main():
-    db = Database()
-    await db.initdb()
-    await bot.polling()
-
-run(main())
+run(bot.polling())
