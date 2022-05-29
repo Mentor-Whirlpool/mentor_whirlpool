@@ -25,7 +25,6 @@ async def mentor_start(message):
         Iterable with all handles texts
     """
     return ['Запросы', 'Мои темы', 'Мои студенты']
-    raise NotImplementedError
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Запросы')
@@ -42,6 +41,7 @@ async def works(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
+    # description - название курсовой, запросы спмсок кнопок
     db = Database()
     my_subjects_ = []
     for mentor in await db.get_mentors():
@@ -50,29 +50,33 @@ async def works(message):
             break
     course_works = await db.get_course_works(my_subjects_)
     # course_works = [{
-    #     'name': 'w1',
+    #     'id': 'id1',
+    #     'name': 'name1',
     #     'chat_id': 'id1',
     #     'description': 'd1'
     # }, {
-    #     'name': 'w2',
+    #     'id': 'id2',
+    #     'name': 'name2',
     #     'chat_id': 'id2',
     #     'description': 'd2'
     # }, {
-    #     'name': 'w3',
+    #     'id': 'id3',
+    #     'name': 'name3',
     #     'chat_id': 'id3',
     #     'description': 'd3'
     # }, {
-    #     'name': 'w4',
+    #     'id': 'id4',
+    #     'name': 'name4',
     #     'chat_id': 'id4',
     #     'description': 'd4'
     # }, ]
+
+    markup = types.InlineKeyboardMarkup()
     for work in course_works:
-        markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('Выбрать', callback_data='work_' + work['name']))
-        await bot.send_message(message.chat.id, f'*{work["name"]}* | {work["chat_id"]}\n{work["description"]}',
-                               reply_markup=markup,
-                               parse_mode='markdown')
-    raise NotImplementedError
+        markup.add(
+            types.InlineKeyboardButton(f'{work["chat_id"]}\n{work["description"]}', callback_data='work_' + work['id']))
+
+    await bot.send_message(message.chat.id, '*Доступные курсовые работы*', reply_markup=markup, parse_mode='markdown')
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('work_'))
@@ -160,7 +164,7 @@ async def callback_show_course_works_by_subject(call):
     db = Database()
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(*[types.InlineKeyboardButton(work, callback_data='work_' + work) for work in
-                 await db.get_course_works([call.data[8:]])]) # добавление курсачей будет в callback_query_work
+                 await db.get_course_works([call.data[8:]])])  # добавление курсачей будет в callback_query_work
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, f'Курсовые работы по теме *{call.data[8:]}*', reply_markup=markup,
                            parse_mode='markdown')
@@ -196,3 +200,8 @@ async def set_subjects(message):
         A pyTelegramBotAPI Message type class
     """
     raise NotImplementedError
+
+
+@bot.message_handler(func=lambda msg: msg.text == 'Мои студенты')
+async def my_students(message):
+    await bot.message_handler(message.chat.id, 'Тут будет список студентов')
