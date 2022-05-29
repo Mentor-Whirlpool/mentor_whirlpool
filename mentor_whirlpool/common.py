@@ -2,7 +2,7 @@ from telegram import bot
 from telebot import types
 
 from database import Database
-from generic_handles import generic_start
+from students_handles import generic_start
 from mentor_handles import mentor_start
 from admin_handles import admin_start
 from support_handles import support_start
