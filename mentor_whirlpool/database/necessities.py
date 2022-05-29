@@ -38,7 +38,7 @@ class Database:
         ID(PRIMARY KEY) | CHAT_ID (BIGINT NOT NULL UNIQUE)
         """
         if self.db is None:
-            self.db = await psycopg.AsyncConnection.connectnect(self.conn_opts)
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await gather(self.db.execute('CREATE TABLE IF NOT EXISTS STUDENTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
@@ -77,7 +77,7 @@ class Database:
             line = {
                 'id': i[0],
                 'name': i[1],
-                'student': i[2],
+                'chat_id': i[2],
                 'course_works': i[3],
             }
             list.append(line)
@@ -123,16 +123,16 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         tasks = []
-        work = await self.db.execute('INSERT INTO COURSE_WORKS VALUES( '
-                                     'DEFAULT, %(chat_id)s, '
-                                     '%(subjects)s, %(description)s) '
-                                     'RETURNING ID', line)
+        work = (await (await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
+                                             'DEFAULT, %(chat_id)s, '
+                                             '%(subjects)s, %(description)s) '
+                                             'RETURNING ID', line)).fetchone())[0]
         tasks.append(self.db.execute('INSERT INTO STUDENTS VALUES('
                                      'DEFAULT, %s, %s, %s) '
-                                     'ON CONFLICT (CHAT_ID, COURSE_WORKS) DO '
-                                     'UPDATE COURSE_WORKS = '
-                                     'ARRAY_APPEND(%s, EXCLUDED.COURSE_WORKS)',
-                                     (line['name'], line['chat_id'], work, work,)))
+                                     'ON CONFLICT (CHAT_ID) DO '
+                                     'UPDATE SET COURSE_WORKS = '
+                                     'ARRAY_APPEND(EXCLUDED.COURSE_WORKS, %s)',
+                                     (line['name'], line['chat_id'], [work], work,)))
         for subj in line['subjects']:
             tasks.append(self.add_subject(subj))
         await gather(*tasks)
@@ -172,16 +172,17 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        if not subjects:
-            res = await (await self.db.execute('SELECT * FROM COURSE_WORKS')).fetchall()
-            return await self.assemble_courses_dict(res)
-        if not student:
+        if subjects:
             res = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                                'WHERE SUBJECTS = ANY(%s)',
                                                (subjects,))).fetchall()
             return await self.assemble_courses_dict(res)
-        res = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
-                                           'WHERE ID = %s', (student,))).fetchall()
+        if student:
+            res = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
+                                               'WHERE STUDENT = %s',
+                                               (student,))).fetchall()
+            return await self.assemble_courses_dict(res)
+        res = await (await self.db.execute('SELECT * FROM COURSE_WORKS')).fetchall()
         return await self.assemble_courses_dict(res)
 
     async def get_student_course_works(self, chat_id):
@@ -258,10 +259,10 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('DELETE FROM COURSE_WORKS '
-                              'WHERE CHAT_ID = %s', (id,))
+                              'WHERE STUDENT = %s', (id,))
         student_relevant = (await (await self.db.execute('SELECT EXISTS('
                                                          'SELECT * FROM COURSE_WORKS '
-                                                         'WHERE CHAT_ID = %s))',
+                                                         'WHERE STUDENT = %s)',
                                                          (id,))).fetchone())[0]
         if not student_relevant:
             await self.db.execute('DELETE FROM STUDENTS '
@@ -269,7 +270,7 @@ class Database:
         await self.db.commit()
 
     # accepted
-    async def accept_work(self, mentor, work):
+    async def accept_work(self, mentor, work_id):
         """
         Moves a line from COURSE_WORKS to ACCEPTED table, increments LOAD
         column in MENTORS table and appends ID into COURSE_WORKS column
@@ -283,15 +284,15 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        print(work_id)
         line = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
-                                            'WHERE STUDENT = %(student)s AND '
-                                            'DESCRIPTION = %(description)s'), work).fetchone()
+                                            'WHERE ID = %s', (work_id,))).fetchone()
         await self.db.execute('INSERT INTO ACCEPTED VALUES('
-                              'DEFAULT, %s, %s, %s) '
-                              'ON CONFLICT (STUDENT) DO NOTHING', line[1:]) # probably bad (not comma ended)
+                              '%s, %s, %s, %s) '
+                              'ON CONFLICT (STUDENT) DO NOTHING',
+                              (line[0], line[1], line[2], line[3],))
         await self.db.execute('DELETE FROM COURSE_WORKS '
-                              'WHERE STUDENT = %(student)s AND '
-                              'DESCRIPTION = %(description)s', work)
+                              'WHERE ID = %s', (work_id,))
         # TODO: need to increment LOAD
         await self.db.commit()
 
@@ -313,6 +314,22 @@ class Database:
         await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
                               'DEFAULT, %s, %s, %s)', line[1:]) # probably bad (not comma ended)
         await self.db.commit()
+
+    async def get_accepted(self, subjects=[], student=None):
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        if subjects:
+            res = await (await self.db.execute('SELECT * FROM ACCEPTED '
+                                               'WHERE SUBJECTS = ANY(%s)',
+                                               (subjects,))).fetchall()
+            return await self.assemble_courses_dict(res)
+        if student:
+            res = await (await self.db.execute('SELECT * FROM ACCEPTED '
+                                               'WHERE STUDENT = %s',
+                                               (student,))).fetchall()
+            return await self.assemble_courses_dict(res)
+        res = await (await self.db.execute('SELECT * FROM ACCEPTED')).fetchall()
+        return await self.assemble_courses_dict(res)
 
     # mentor
     async def add_mentor(self, line):
