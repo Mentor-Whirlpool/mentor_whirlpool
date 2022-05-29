@@ -1,15 +1,16 @@
 import asynctest
-from asyncio import gather
+from asyncio import gather, sleep
 from database import Database
 import random
 import string
 
 
-class TestDatabase(asynctest.TestCase):
+# fine to test altogether, because different tables are tested
+class TestDatabaseSimple(asynctest.TestCase):
     async def test_initdb(self):
         self.db = Database()
         await self.db.initdb()
-        expected_tables = [('students',)('course_works',), ('accepted',), ('subjects',),
+        expected_tables = [('students',), ('course_works',), ('accepted',), ('subjects',),
                            ('mentors',), ('admins',)]
         # executemany is screwed
         for table in expected_tables:
@@ -59,13 +60,13 @@ class TestDatabase(asynctest.TestCase):
         subj = ['SQL Injection', 'TestSubj']
         mentors = [{
                 'name': name,
-                'chat_id': random.randint(0, 99999999),
+                'chat_id': random.randint(0, 9999),
                 'subjects': subj,
             } for name in ['Alice', 'Bob', 'Victor', 'Eugene']]
         mentors.append(
             {
                 'name': 'Yoshi',
-                'chat_id': random.randint(0, 9999999999),
+                'chat_id': random.randint(0, 9999),
                 'subjects': None
             }
                       )
@@ -83,10 +84,17 @@ class TestDatabase(asynctest.TestCase):
         dbmentors.sort(key=lambda x: x['name'])
         self.assertListEqual(mentors, dbmentors)
 
+    def check_contains_student(self, student, dbstudents):
+        for stud in dbstudents:
+            if stud['name'] == student:
+                return True
+        return False
+
     async def test_add_remove_course_work(self):
         self.db = Database()
         await self.db.initdb()
         await self.db.db.execute('DELETE FROM COURSE_WORKS')
+        await self.db.db.execute('DELETE FROM STUDENTS')
         # get 1000 random 10 character strings
         subjects = [(''.join(random.choice(string.printable) for i in range(10))) for j in range(1000)]
         names = [(''.join(random.choice(string.printable) for i in range(10))) for j in range(1000)]
@@ -101,25 +109,82 @@ class TestDatabase(asynctest.TestCase):
         for work in course_works:
             tasks.append(self.db.add_course_work(work))
         await gather(*tasks)
-        course_works.sort(key=lambda x: x['chat_id'])
+        for work in course_works:
+            work.pop('name')
+            work['student'] = work.pop('chat_id')
+        course_works.sort(key=lambda x: x['student'])
         dbworks = await self.db.get_course_works()
-        dbworks.sort(key=lambda x: x['chat_id'])
+        for work in dbworks:
+            work.pop('id')
+        dbworks.sort(key=lambda x: x['student'])
         self.assertListEqual(course_works, dbworks)
+        dbstudents = await self.db.get_students()
+        for stud in names:
+            self.assertTrue(self.check_contains_student(stud, dbstudents))
         to_remove = list(dict.fromkeys([random.randint(0, len(course_works)) for i in range(20)]))
         # does not affect anything, only needed for source list deletion
         to_remove.sort()
-        print(to_remove)
         tasks = []
         for rem in to_remove:
-            tasks.append(self.db.remove_course_work(course_works[rem]['chat_id']))
+            tasks.append(self.db.remove_course_work(course_works[rem]['student']))
         await gather(*tasks)
         for i in range(len(to_remove)):
             course_works.pop(to_remove[i] - i)
         dbworks = await self.db.get_course_works()
-        dbworks.sort(key=lambda x: x['chat_id'])
+        dbworks.sort(key=lambda x: x['student'])
+        for work in dbworks:
+            work.pop('id')
         self.assertListEqual(course_works, dbworks)
 
 
+class TestDatabaseAccepted(asynctest.TestCase):
+    async def test_accept_course_work(self):
+        self.db = Database()
+        await self.db.initdb()
+        await self.db.db.execute('DELETE FROM COURSE_WORKS')
+        await self.db.db.execute('DELETE FROM STUDENTS')
+        await self.db.db.execute('DELETE FROM MENTORS')
+        await self.db.db.execute('DELETE FROM ACCEPTED')
+        course_works = [{
+                'name': 'Helen',
+                'chat_id': 10000,
+                'subjects': ['SQL', 'Qt'],
+                'description': None,
+            },
+            {
+                'name': 'Alice',
+                'chat_id': 10001,
+                'subjects': ['SQL', 'TCP'],
+                'description': 'Something',
+            },
+            {
+                'name': 'Bob',
+                'chat_id': 10002,
+                'subjects': ['TypeScript', 'Crypto'],
+                'description': 'Nothing',
+            }]
+        tasks = []
+        for work in course_works:
+            tasks.append(self.db.add_course_work(work))
+        await gather(*tasks)
+        for work in course_works:
+            work.pop('name')
+            work['student'] = work.pop('chat_id')
+        accepted = await self.db.get_accepted()
+        self.assertListEqual(accepted, [])
+        dbwork = await self.db.get_course_works()
+        self.db.add_mentor({
+                'name': 'Yoshi',
+                'chat_id': 10003,
+                'subjects': None
+            })
+        await self.db.accept_work(4, dbwork[0]['id'])
+        accepted = await self.db.get_accepted()
+        self.assertListEqual(accepted, [dbwork[0]])
+
+
 def runtests():
-    test_case = TestDatabase("test_initdb")
+    test_case = TestDatabaseSimple("test_initdb")
+    test_case.run()
+    test_case = TestDatabaseAccepted("test_initdb")
     test_case.run()
