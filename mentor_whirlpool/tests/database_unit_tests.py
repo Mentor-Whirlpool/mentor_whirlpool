@@ -59,10 +59,10 @@ class TestDatabaseSimple(asynctest.TestCase):
         await self.db.db.execute('DELETE FROM MENTORS')
         subj = ['SQL Injection', 'TestSubj']
         mentors = [{
-            'name': name,
-            'chat_id': random.randint(0, 9999),
-            'subjects': subj,
-        } for name in ['Alice', 'Bob', 'Victor', 'Eugene']]
+                'name': name,
+                'chat_id': random.randint(0, 9999),
+                'subjects': subj,
+            } for name in ['Alice', 'Bob', 'Victor', 'Eugene']]
         mentors.append(
             {
                 'name': 'Yoshi',
@@ -146,11 +146,11 @@ class TestDatabaseAccepted(asynctest.TestCase):
         await self.db.db.execute('DELETE FROM MENTORS')
         await self.db.db.execute('DELETE FROM ACCEPTED')
         course_works = [{
-            'name': 'Helen',
-            'chat_id': 10000,
-            'subjects': ['SQL', 'Qt'],
-            'description': None,
-        },
+                'name': 'Helen',
+                'chat_id': 10000,
+                'subjects': ['SQL', 'Qt'],
+                'description': None,
+            },
             {
                 'name': 'Alice',
                 'chat_id': 10001,
@@ -174,10 +174,10 @@ class TestDatabaseAccepted(asynctest.TestCase):
         self.assertListEqual(accepted, [])
         dbwork = await self.db.get_course_works()
         self.db.add_mentor({
-            'name': 'Yoshi',
-            'chat_id': 10003,
-            'subjects': None
-        })
+                'name': 'Yoshi',
+                'chat_id': 10003,
+                'subjects': None
+            })
         await self.db.accept_work(4, dbwork[0]['id'])
         accepted = await self.db.get_accepted()
         self.assertListEqual(accepted, [dbwork[0]])
