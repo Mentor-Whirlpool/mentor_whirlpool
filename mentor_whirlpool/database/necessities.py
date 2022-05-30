@@ -87,9 +87,9 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         values = []
-        if id is None:
+        if student is None:
             values = await self.db.execute('SELECT * FROM STUDENTS '
-                                           'WHERE ID = %s', (id,))
+                                           'WHERE ID = %s', (student,))
             return await self.assemble_students_dict(await values.fetchall())
         return await self.assemble_students_dict(
             await (await self.db.execute('SELECT * FROM STUDENTS')).fetchall()
@@ -242,7 +242,7 @@ class Database:
         await gather(*tasks)
         await self.db.commit()
 
-    async def remove_course_work(self, id):
+    async def remove_course_work(self, id_field):
         """
         Removes a line from COURSE_WORKS table
         Removing a course work decrements COUNT column in SUBJECTS table
@@ -259,14 +259,14 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('DELETE FROM COURSE_WORKS '
-                              'WHERE STUDENT = %s', (id,))
+                              'WHERE STUDENT = %s', (id_field,))
         student_relevant = (await (await self.db.execute('SELECT EXISTS('
                                                          'SELECT * FROM COURSE_WORKS '
                                                          'WHERE STUDENT = %s)',
-                                                         (id,))).fetchone())[0]
+                                                         (id_field,))).fetchone())[0]
         if not student_relevant:
             await self.db.execute('DELETE FROM STUDENTS '
-                                  'WHERE CHAT_ID = %s', (id,))
+                                  'WHERE CHAT_ID = %s', (id_field,))
         await self.db.commit()
 
     # accepted
@@ -312,7 +312,8 @@ class Database:
                                             'WHERE STUDENT = %(student)s AND '
                                             'DESCRIPTION = %(description)s', work)).fetchone()
         await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
-                              'DEFAULT, %s, %s, %s)', line[1:]) # probably bad (not comma ended)
+                              '%s, %s, %s, %s)',
+                              (line[0], line[1], line[2], line[3],))
         await self.db.commit()
 
     async def get_accepted(self, subjects=[], student=None):
