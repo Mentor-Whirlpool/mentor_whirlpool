@@ -151,7 +151,8 @@ async def my_subjects(message):
     if my_subjects_ is not None:
         delete = types.InlineKeyboardButton('Удалить', callback_data='sub_delete')
         markup.row(add, delete)
-        markup.add(*[types.InlineKeyboardButton(subject, callback_data='subject_' + subject) for subject in my_subjects_])
+        markup.add(
+            *[types.InlineKeyboardButton(subject, callback_data='subject_' + subject) for subject in my_subjects_])
     else:
         markup.add(add)
 
@@ -191,7 +192,8 @@ async def callback_show_subjects_to_add(call):
 
     # subjects_to_add = ['sub1', 'sub2', 'sub3', 'sub4']
     markup = types.InlineKeyboardMarkup()
-    markup.add(*[types.InlineKeyboardButton(subject, callback_data='sub_add_' + subject) for subject in subjects_to_add])
+    markup.add(
+        *[types.InlineKeyboardButton(subject, callback_data='sub_add_' + subject) for subject in subjects_to_add])
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, '*Все темы*', reply_markup=markup, parse_mode='markdown')
 
@@ -219,4 +221,12 @@ async def set_subjects(message):
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои студенты')
 async def my_students(message):
-    await bot.message_handler(message.chat.id, 'Тут будет список студентов')
+    db = Database()
+    # my_students_ = ['st1','st2','st3']
+    my_students_ = []
+    for mentor in await db.get_mentors():
+        if mentor['chat_id'] == message.from_user.id:
+            my_students_ = mentor['students']
+            break
+    str_my_students_ = '\n'.join(my_students_)
+    await bot.send_message(message.chat.id, f'*Список моих студентов*\n{str_my_students_}', parse_mode='markdown')
