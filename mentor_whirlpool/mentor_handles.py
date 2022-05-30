@@ -101,7 +101,7 @@ async def callback_query_work(call):
 @bot.message_handler(func=lambda msg: msg.text == 'Темы')
 async def subjects(message):
     """
-    Should send a list of inline buttons from db.subjects() and a finish button
+    Should send a list of inline buttons from db.get_subjects() and a finish button
 
     Buttons with subjects can be clicked to narrow the list
     Clicking on a finish button should produce a list of course works with
@@ -124,7 +124,7 @@ async def subjects(message):
 @bot.message_handler(func=lambda msg: msg.text == 'Мои темы')
 async def my_subjects(message):
     """
-    Should send a list of inline buttons from db.subjects() with a from_user.id
+    Should send a list of inline buttons from db.get_subjects() with a from_user.id
     argument and a finish button
 
     Buttons with subjects can be clicked to narrow the list
@@ -146,14 +146,17 @@ async def my_subjects(message):
             break
 
     markup = types.InlineKeyboardMarkup(row_width=3)
-    add = types.InlineKeyboardButton('Добавить', callback_data='sub_add')
-    delete = types.InlineKeyboardButton('Удалить', callback_data='sub_delete')
-    markup.row(add, delete)
-    markup.add(*[types.InlineKeyboardButton(subject, callback_data='subject_' + subject) for subject in my_subjects_])
+    add = types.InlineKeyboardButton('Добавить', callback_data='sub_to_add')
+
+    if my_subjects_ is not None:
+        delete = types.InlineKeyboardButton('Удалить', callback_data='sub_delete')
+        markup.row(add, delete)
+        markup.add(*[types.InlineKeyboardButton(subject, callback_data='subject_' + subject) for subject in my_subjects_])
+    else:
+        markup.add(add)
 
     await bot.send_message(message.chat.id, f'*Мои темы*', reply_markup=markup,
                            parse_mode='markdown')
-    raise NotImplementedError
 
 
 # мои темы получаешь еще кнопки с темам, тыкаешь на кнопку получаешь список курсачей по этой теме (тоже кнопками) -> жмешь на курсач и принимаешь его
@@ -170,18 +173,30 @@ async def callback_show_course_works_by_subject(call):
                            parse_mode='markdown')
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'sub_add')
-async def callback_show_add_subject(call):
+@bot.callback_query_handler(func=lambda call: call.data == 'sub_to_add')
+async def callback_show_subjects_to_add(call):
     db = Database()
-    # subjects_ = await db.get_subjects()
-    subjects_ = ['sub1', 'sub2', 'sub3', 'sub4']
+    my_subjects_ = []
+
+    for mentor in await db.get_mentors():
+        if mentor['chat_id'] == call.from_user.id:
+            my_subjects_ = mentor['subjects']
+            break
+
+    subjects_to_add = await db.get_subjects()
+
+    for subject in subjects_to_add:
+        if subject in my_subjects_:
+            subjects_to_add.remove(subject)
+
+    # subjects_to_add = ['sub1', 'sub2', 'sub3', 'sub4']
     markup = types.InlineKeyboardMarkup()
-    markup.add(*[types.InlineKeyboardButton(subject, callback_data='s_add_' + subject) for subject in subjects_])
+    markup.add(*[types.InlineKeyboardButton(subject, callback_data='sub_add_' + subject) for subject in subjects_to_add])
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, '*Все темы*', reply_markup=markup, parse_mode='markdown')
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('s_add_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('sub_add_'))
 async def callback_add_subject(call):
     await bot.answer_callback_query(call.id)
 
