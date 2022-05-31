@@ -100,13 +100,26 @@ class Database:
         )
 
     # course works
-    async def add_subject(self, subj):
+    async def add_subject(self, subject):
+        """
+        Inserts a string into SUBJECTS table
+
+        Parameters
+        ----------
+        subject : str
+            string of subject
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBDoesNotExist
+        """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('INSERT INTO SUBJECTS(SUBJECT, COUNT) '
                               'VALUES(%s, 1) '
                               'ON CONFLICT (SUBJECT) DO '
-                              'UPDATE SET COUNT = EXCLUDED.COUNT + 1', (subj,))
+                              'UPDATE SET COUNT = EXCLUDED.COUNT + 1', (subject,))
         await self.db.commit()
 
     async def add_course_work(self, line):
@@ -410,6 +423,50 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('DELETE FROM MENTORS '
                               'WHERE CHAT_ID = %s', (chat_id,))
+
+    async def add_mentor_subject(self, id, subject):
+        """
+        Appends a string into SUBJECTS array of a mentor with a specified ID
+
+        Parameters
+        ----------
+        id : int
+            ID (not chat_id) of mentor to edit
+        subjects : str
+            string of subject
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBDoesNotExist
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('UPDATE MENTORS '
+                              'SET SUBJECTS = ARRAY_APPEND(SUBJECTS, %s) '
+                              'WHERE ID = %s', (subject, id,))
+
+    async def remove_mentor_subject(self, id, subject):
+        """
+        Removes a string from SUBJECTS array of a mentor with a specified ID
+
+        Parameters
+        ----------
+        id : int
+            ID (not chat_id) of mentor to edit
+        subjects : str
+            string of subject
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBDoesNotExist
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('UPDATE MENTORS '
+                              'SET SUBJECTS = ARRAY_REMOVE(SUBJECTS, %s) '
+                              'WHERE ID = %s', (subject, id,))
 
     # subjects
     async def get_subjects(self):
