@@ -83,13 +83,17 @@ class Database:
             list.append(line)
         return list
 
-    async def get_students(self, student=None):
+    async def get_students(self, student=None, chat_id=None):
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         values = []
-        if student is None:
+        if student is not None:
             values = await self.db.execute('SELECT * FROM STUDENTS '
                                            'WHERE ID = %s', (student,))
+            return await self.assemble_students_dict(await values.fetchall())
+        if chat_id is not None:
+            values = await self.db.execute('SELECT * FROM STUDENTS '
+                                           'WHERE CHAT_ID = %s', (chat_id,))
             return await self.assemble_students_dict(await values.fetchall())
         return await self.assemble_students_dict(
             await (await self.db.execute('SELECT * FROM STUDENTS')).fetchall()
@@ -173,9 +177,11 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         if subjects:
-            res = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
-                                               'WHERE SUBJECTS = ANY(%s)',
-                                               (subjects,))).fetchall()
+            query = 'SELECT * FROM COURSE_WORKS WHERE %s = ANY(SUBJECTS)'
+            for subj in range(len(subjects) - 1):
+                query += ' AND %s = ANY(SUBJECTS)'
+            res = await (await self.db.execute(query,
+                                               tuple(subjects))).fetchall()
             return await self.assemble_courses_dict(res)
         if student:
             res = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
@@ -185,7 +191,7 @@ class Database:
         res = await (await self.db.execute('SELECT * FROM COURSE_WORKS')).fetchall()
         return await self.assemble_courses_dict(res)
 
-    async def get_student_course_works(self, chat_id):
+    async def get_student_course_works(self, chat_id_):
         """
         Gets all submitted course works from a specified student
 
@@ -203,11 +209,10 @@ class Database:
         iterable
             Iterable over all compliant lines (dict of columns excluding ID)
         """
-        if self.db is None:
-            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        res = (await self.db.execute('SELECT * FROM COURSE_WORKS '
-                                     'WHERE STUDENT = %s', (chat_id,))).fetchall()
-        return await self.assemble_courses_dict(await res)
+        import warnings
+        warnings.warn('Don\'t use get_student_course_works, use get_course_works with student argument instead')
+        id = await self.get_students(chat_id=chat_id_)
+        return await self.get_course_works(id[0]['id'])
 
     async def modify_course_work(self, line):
         """
