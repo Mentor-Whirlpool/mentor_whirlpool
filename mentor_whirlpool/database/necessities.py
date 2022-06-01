@@ -424,7 +424,7 @@ class Database:
         await self.db.execute('DELETE FROM MENTORS '
                               'WHERE CHAT_ID = %s', (chat_id,))
 
-    async def add_mentor_subject(self, id, subject):
+    async def add_mentor_subjects(self, id, subject):
         """
         Appends a string into SUBJECTS array of a mentor with a specified ID
 
@@ -443,8 +443,10 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('UPDATE MENTORS '
-                              'SET SUBJECTS = ARRAY_APPEND(SUBJECTS, %s) '
-                              'WHERE ID = %s', (subject, id,))
+                              'SET SUBJECTS = (CASE WHEN SUBJECTS IS NULL THEN %s '
+                              '               ELSE SUBJECTS || %s '
+                              '               END) '
+                              'WHERE ID = %s', (subject, subject, id,))
         await self.db.commit()
 
     async def remove_mentor_subject(self, id, subject):
