@@ -197,7 +197,7 @@ class Database:
             res = await (await self.db.execute(query,
                                                tuple(subjects))).fetchall()
             return await self.assemble_courses_dict(res)
-        if student:
+        if student is not None:
             res = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                                'WHERE STUDENT = %s',
                                                (student,))).fetchall()
@@ -289,7 +289,7 @@ class Database:
         await self.db.commit()
 
     # accepted
-    async def accept_work(self, mentor, work_id):
+    async def accept_work(self, mentor_id, work_id):
         """
         Moves a line from COURSE_WORKS to ACCEPTED table, increments LOAD
         column in MENTORS table and appends ID into COURSE_WORKS column
@@ -310,9 +310,13 @@ class Database:
                               '%s, %s, %s, %s) '
                               'ON CONFLICT (STUDENT) DO NOTHING',
                               (line[0], line[1], line[2], line[3],))
+        #                      id      student  subjects  description
         await self.db.execute('DELETE FROM COURSE_WORKS '
                               'WHERE ID = %s', (work_id,))
-        # TODO: need to increment LOAD
+        await self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1, '
+                              'STUDENTS = ARRAY_APPEND(STUDENTS, CAST(%S AS BIGINT))'
+                              'WHERE ID = %s', (line[1], mentor_id,))
+        #                                      student
         await self.db.commit()
 
     async def readmission_work(self, work):
