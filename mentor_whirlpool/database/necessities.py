@@ -445,6 +445,7 @@ class Database:
         await self.db.execute('UPDATE MENTORS '
                               'SET SUBJECTS = ARRAY_APPEND(SUBJECTS, %s) '
                               'WHERE ID = %s', (subject, id,))
+        await self.db.commit()
 
     async def remove_mentor_subject(self, id, subject):
         """
@@ -467,6 +468,7 @@ class Database:
         await self.db.execute('UPDATE MENTORS '
                               'SET SUBJECTS = ARRAY_REMOVE(SUBJECTS, %s) '
                               'WHERE ID = %s', (subject, id,))
+        await self.db.commit()
 
     # subjects
     async def get_subjects(self):
