@@ -219,10 +219,38 @@ class TestDatabaseFiltered(asynctest.TestCase):
         self.assertListEqual(filtered_course_works, answ_filtered_course_works)
 
 
-def runtests():
-    test_case = TestDatabaseSimple("test_initdb")
-    test_case.run()
-    test_case = TestDatabaseAccepted("test_initdb")
-    test_case.run()
-    test_case = TestDatabaseFiltered("test_initdb")
-    test_case.run()
+class TestDatabaseMentorSubjects(asynctest.TestCase):
+    async def test_add_remove_mentor_subjects(self):
+        self.db = Database()
+        await self.db.initdb()
+        await self.db.db.execute('DELETE FROM MENTORS')
+        await self.db.db.execute('DELETE FROM SUBJECTS')
+        start_subj = ['SQL Injection', 'TestSubj']
+        mentor = {
+            'name': 'Alice',
+            'chat_id': 1,
+            'subjects': start_subj,
+        }
+        no_subj_mentor = {
+            'name': 'Bob',
+            'chat_id': 2,
+            'subjects': None,
+        }
+        tasks = []
+        tasks.append(self.db.add_mentor(mentor))
+        tasks.append(self.db.add_mentor(no_subj_mentor))
+        await gather(*tasks)
+        dbmentors = await self.db.get_mentors()
+        dbmentors.sort(key=lambda x: x['name'])
+        new_subjects = ['TCP/IP', 'Qt']
+        tasks = []
+        for ment in dbmentors:
+            tasks.append(self.db.add_mentor_subject(ment['id'], new_subjects))
+            if ment['subjects'] is None:
+                ment['subjects'] = new_subjects
+            else:
+                ment['subjects'] += new_subjects
+        await gather(*tasks)
+        dbmentors_new = await self.db.get_mentors()
+        dbmentors_new.sort(key=lambda x: x['name'])
+        self.assertListEqual(dbmentors, dbmentors_new)
