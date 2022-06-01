@@ -148,7 +148,8 @@ class Database:
                                      'DEFAULT, %s, %s, %s) '
                                      'ON CONFLICT (CHAT_ID) DO '
                                      'UPDATE SET COURSE_WORKS = '
-                                     'ARRAY_APPEND(EXCLUDED.COURSE_WORKS, %s)',
+                                     'ARRAY_APPEND(EXCLUDED.COURSE_WORKS, '
+                                     'CAST(%s as BIGINT))',
                                      (line['name'], line['chat_id'], [work], work,)))
         for subj in line['subjects']:
             tasks.append(self.add_subject(subj))
@@ -382,6 +383,7 @@ class Database:
         list = []
         for i in cursor:
             line = {
+                'id': i[0],
                 'name': i[1],
                 'chat_id': i[2],
                 'subjects': i[3],
