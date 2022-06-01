@@ -149,7 +149,7 @@ async def my_subjects(message):
     add = types.InlineKeyboardButton('Добавить', callback_data='sub_to_add')
 
     if my_subjects_ is not None:
-        delete = types.InlineKeyboardButton('Удалить', callback_data='sub_delete')
+        delete = types.InlineKeyboardButton('Удалить', callback_data='sub_to_delete')
         markup.row(add, delete)
         markup.add(
             *[types.InlineKeyboardButton(subject, callback_data='subject_' + subject) for subject in my_subjects_])
@@ -181,7 +181,8 @@ async def callback_show_subjects_to_add(call):
 
     for mentor in await db.get_mentors():
         if mentor['chat_id'] == call.from_user.id:
-            my_subjects_ = mentor['subjects']
+            if mentor['subjects'] is not None:
+                my_subjects_ = mentor['subjects']
             break
 
     subjects_to_add = await db.get_subjects()
@@ -200,7 +201,49 @@ async def callback_show_subjects_to_add(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('sub_add_'))
 async def callback_add_subject(call):
+    db = Database()
+
+    my_id = None
+    for mentor in await db.get_mentors():
+        if mentor['chat_id'] == call.from_user.id:
+            my_id = mentor['id']
+            break
+
+    await db.add_mentor_subjects(my_id, [call.data[8:]])
     await bot.answer_callback_query(call.id)
+    await bot.send_message(call.from_user.id, f'Тема *{call.data[8:]}* успешно добавлена', parse_mode='markdown')
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'sub_to_delete')
+async def callback_show_subjects_to_delete(call):
+    db = Database()
+    my_subjects_ = []
+
+    for mentor in await db.get_mentors():
+        if mentor['chat_id'] == call.from_user.id:
+            my_subjects_ = mentor['subjects']
+            break
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        *[types.InlineKeyboardButton(subject, callback_data='sub_delete_' + subject) for subject in my_subjects_])
+    await bot.answer_callback_query(call.id)
+    await bot.send_message(call.from_user.id, '*Удалить тему*', reply_markup=markup, parse_mode='markdown')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('sub_delete_'))
+async def callback_add_subject(call):
+    db = Database()
+    my_id = None
+
+    for mentor in await db.get_mentors():
+        if mentor['chat_id'] == call.from_user.id:
+            my_id = mentor['id']
+            break
+
+    await db.remove_mentor_subject(my_id, call.data[11:])
+    await bot.answer_callback_query(call.id)
+    await bot.send_message(call.from_user.id, f'Тема *{call.data[11:]}* успешно удалена', parse_mode='markdown')
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Установить темы')
@@ -228,5 +271,8 @@ async def my_students(message):
         if mentor['chat_id'] == message.from_user.id:
             my_students_ = mentor['students']
             break
-    str_my_students_ = '\n'.join(my_students_)
+    if my_students_ is None:
+        str_my_students_ = 'У Вас нет студентов!'
+    else:
+        str_my_students_ = '\n'.join(my_students_)
     await bot.send_message(message.chat.id, f'*Список моих студентов*\n{str_my_students_}', parse_mode='markdown')
