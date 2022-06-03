@@ -97,7 +97,7 @@ async def callback_mentors_info(call):
             break
 
     message_subjects = '\n'.join(mentor_info['subjects'])
-    message_students = '\n'.join(str(student) for student in mentor_info['students'])
+    message_students = '\n'.join(student['name'] for student in mentor_info['students'])
     markup = types.InlineKeyboardMarkup()
     edit_subjects = types.InlineKeyboardButton('Изменить тему', callback_data='edit_subjects')
     edit_students = types.InlineKeyboardButton('Изменить студентов', callback_data='edit_students')
