@@ -262,5 +262,5 @@ async def my_students(message):
     if my_students_ is None:
         str_my_students_ = 'У Вас нет студентов!'
     else:
-        str_my_students_ = '\n'.join(str(student) for student in my_students_)
+        str_my_students_ = '\n'.join('@'+student['name']+student['course_works'] for student in my_students_)
     await bot.send_message(message.chat.id, f'*Список моих студентов*\n{str_my_students_}', parse_mode='markdown')
