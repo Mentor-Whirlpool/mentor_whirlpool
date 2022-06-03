@@ -392,7 +392,7 @@ class Database:
                 'chat_id': i[2],
                 'subjects': i[3],
                 'load': i[4],
-                'students': i[5]
+                'students': [self.get_students(student=id) for id in i[5]],
             }
             list.append(line)
         return list
