@@ -415,7 +415,7 @@ class Database:
         if chat_id is not None:
             mentors = await (await self.db.execute('SELECT * FROM MENTORS '
                                                    'WHERE CHAT_ID = %s',
-                                                   chat_id)).fetchone()
+                                                   (chat_id,))).fetchone()
             if mentors is None:
                 return None  # raise
         else:
@@ -441,7 +441,7 @@ class Database:
         return (await (await self.db.execute('SELECT EXISTS('
                                              'SELECT * FROM MENTORS '
                                              'WHERE CHAT_ID = %s)',
-                                             chat_id)).fetchone())[0]
+                                             (chat_id,))).fetchone())[0]
 
     async def remove_mentor(self, chat_id):
         """
@@ -574,7 +574,7 @@ class Database:
         return (await (await self.db.execute('SELECT EXISTS('
                                              'SELECT * FROM ADMINS '
                                              'WHERE CHAT_ID = %s)',
-                                             chat_id)).fetchone())[0]
+                                             (chat_id,))).fetchone())[0]
 
     async def remove_admin(self, chat_id):
         """
