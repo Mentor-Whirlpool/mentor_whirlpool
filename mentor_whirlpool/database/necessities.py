@@ -303,7 +303,6 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        print(work_id)
         line = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                             'WHERE ID = %s', (work_id,))).fetchone()
         await self.db.execute('INSERT INTO ACCEPTED VALUES('
@@ -407,7 +406,7 @@ class Database:
         Returns
         ------
         iterable
-            Iterable over all mentors (dict of columns excluding ID)
+            Iterable over all mentors
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
@@ -415,7 +414,7 @@ class Database:
         if chat_id is not None:
             mentors = await (await self.db.execute('SELECT * FROM MENTORS '
                                                    'WHERE CHAT_ID = %s',
-                                                   (chat_id,))).fetchone()
+                                                   (chat_id,))).fetchall()
             if mentors is None:
                 return None  # raise
         else:
