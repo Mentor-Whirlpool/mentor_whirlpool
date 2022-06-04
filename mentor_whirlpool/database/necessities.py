@@ -386,13 +386,16 @@ class Database:
     async def assemble_mentors_dict(self, cursor):
         list = []
         for i in cursor:
+            students = []
+            if i[5] is not None:
+                students = [await self.get_students(student=id)[0] for id in i[5]]
             line = {
                 'id': i[0],
                 'name': i[1],
                 'chat_id': i[2],
                 'subjects': i[3],
                 'load': i[4],
-                'students': [await self.get_students(student=id)[0] for id in i[5]],
+                'students': students,
             }
             list.append(line)
         return list
