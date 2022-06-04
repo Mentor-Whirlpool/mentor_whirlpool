@@ -400,7 +400,7 @@ class Database:
             list.append(line)
         return list
 
-    async def get_mentors(self):
+    async def get_mentors(self, chat_id=None):
         """
         Gets all lines from MENTORS table
 
@@ -411,8 +411,37 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
+        mentors = None
+        if chat_id is not None:
+            mentors = await (await self.db.execute('SELECT * FROM MENTORS '
+                                                   'WHERE CHAT_ID = %s',
+                                                   chat_id)).fetchone()
+            if mentors is None:
+                return None  # raise
+        else:
+            mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
         return await self.assemble_mentors_dict(mentors)
+
+    async def check_is_mentor(self, chat_id):
+        """
+        Checks if specified chat_id is present in database as a mentor
+
+        Parameters
+        ----------
+        chat_id : int
+            a chat id to check
+
+        Returns
+        -------
+        boolean
+            True if exists, false otherwise
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        return (await (await self.db.execute('SELECT EXISTS('
+                                             'SELECT * FROM MENTORS '
+                                             'WHERE CHAT_ID = %s)',
+                                             chat_id)).fetchone())[0]
 
     async def remove_mentor(self, chat_id):
         """
@@ -525,6 +554,27 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         cur = await (await self.db.execute('SELECT * FROM ADMINS')).fetchall()
         return [adm[1] for adm in cur]
+
+    async def check_is_admin(self, chat_id):
+        """
+        Checks if specified chat_id is present in database as a mentor
+
+        Parameters
+        ----------
+        chat_id : int
+            a chat id to check
+
+        Returns
+        -------
+        boolean
+            True if exists, false otherwise
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        return (await (await self.db.execute('SELECT EXISTS('
+                                             'SELECT * FROM ADMINS '
+                                             'WHERE CHAT_ID = %s)',
+                                             chat_id)).fetchone())[0]
 
     async def remove_admin(self, chat_id):
         """
