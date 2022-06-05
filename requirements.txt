@@ -1,3 +1,6 @@
 pyTelegramBotAPI
 asyncio
 psycopg[c]
+# для тестов
+coverage
+nose
