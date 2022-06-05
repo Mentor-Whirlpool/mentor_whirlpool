@@ -78,7 +78,7 @@ class Database:
                 'id': i[0],
                 'name': i[1],
                 'chat_id': i[2],
-                'course_works': await self.get_course_works(student=i[3]),
+                'course_works': await self.get_course_works(student=i[2]),
             }
             list.append(line)
         return list
@@ -237,6 +237,7 @@ class Database:
         ----------
         line : dict
             Dict field names are 'student': int, 'subjects': str[], 'desc': str
+
         Raises
         ------
         DBAccessError whatever
@@ -313,7 +314,7 @@ class Database:
         await self.db.execute('DELETE FROM COURSE_WORKS '
                               'WHERE ID = %s', (work_id,))
         await self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1, '
-                              'STUDENTS = ARRAY_APPEND(STUDENTS, CAST(%S AS BIGINT))'
+                              'STUDENTS = ARRAY_APPEND(STUDENTS, CAST(%s AS BIGINT))'
                               'WHERE ID = %s', (line[1], mentor_id,))
         #                                      student
         await self.db.commit()
@@ -402,7 +403,6 @@ class Database:
     async def get_mentors(self, chat_id=None):
         """
         Gets all lines from MENTORS table
-
         Returns
         ------
         iterable
@@ -412,9 +412,9 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         mentors = None
         if chat_id is not None:
-            mentors = await (await self.db.execute('SELECT * FROM MENTORS '
-                                                   'WHERE CHAT_ID = %s',
-                                                   (chat_id,))).fetchall()
+            mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
+                                                    'WHERE CHAT_ID = %s',
+                                                    (chat_id,))).fetchone()]
             if mentors is None:
                 return None  # raise
         else:
@@ -537,7 +537,7 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('INSERT INTO ADMINS VALUES('
-                              'DEFAULT, %s,', chat_id)
+                              'DEFAULT, %s)', (chat_id,))
         await self.db.commit()
 
     async def get_admins(self):
