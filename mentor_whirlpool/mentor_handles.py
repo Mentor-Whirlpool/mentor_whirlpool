@@ -41,21 +41,20 @@ async def works(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
-    # description - название курсовой, запросы спмсок кнопок
     db = Database()
-    my_subjects_ = []
+    my_subjects_ = (await db.get_mentors(message.from_user.id))[0]['subjects']
 
-    for mentor in await db.get_mentors():
-        if mentor['chat_id'] == message.from_user.id:
-            my_subjects_ = mentor['subjects']
-            break
+    # for mentor in await db.get_mentors():
+    #     if mentor['chat_id'] == message.from_user.id:
+    #         my_subjects_ = mentor['subjects']
+    #         break
 
     course_works = await db.get_course_works(my_subjects_)
     markup = types.InlineKeyboardMarkup()
 
     for work in course_works:
         markup.add(
-            types.InlineKeyboardButton(f'*{work["student"]}*\n{work["description"]}',
+            types.InlineKeyboardButton(f'{work["student"]}\n{work["description"]}',
                                        callback_data='work_' + str(work['id'])))
 
     await bot.send_message(message.chat.id, '*Доступные курсовые работы*', reply_markup=markup, parse_mode='markdown')
@@ -64,12 +63,12 @@ async def works(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('work_'))
 async def callback_query_work(call):
     db = Database()
-    my_id = None
+    my_id = (await db.get_mentors(call.from_user.id))[0]['id']
 
-    for mentor in await db.get_mentors():
-        if mentor['chat_id'] == call.from_user.id:
-            my_id = mentor['id']
-            break
+    # for mentor in await db.get_mentors():
+    #     if mentor['chat_id'] == call.from_user.id:
+    #         my_id = mentor['id']
+    #         break
 
     course_work_description = ''
     for work in await db.get_course_works():
@@ -123,11 +122,11 @@ async def my_subjects(message):
     """
     db = Database()
     # my_subjects_ = ['sub1', 'sub2', 'sub3', 'sub4']
-    my_subjects_ = []
-    for mentor in await db.get_mentors():
-        if mentor['chat_id'] == message.from_user.id:
-            my_subjects_ = mentor['subjects']
-            break
+    my_subjects_ = (await db.get_mentors(message.from_user.id))[0]['subjects']
+    # for mentor in await db.get_mentors():
+    #     if mentor['chat_id'] == message.from_user.id:
+    #         my_subjects_ = mentor['subjects']
+    #         break
 
     markup = types.InlineKeyboardMarkup(row_width=3)
     add = types.InlineKeyboardButton('Добавить', callback_data='sub_to_add')
@@ -152,7 +151,8 @@ async def callback_show_course_works_by_subject(call):
     db = Database()
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
-        *[types.InlineKeyboardButton(work['description'], callback_data='work_' + work['description']) for work in
+        *[types.InlineKeyboardButton(f'{work["student"]} {work["description"]}',
+                                     callback_data='work_' + str(work['id'])) for work in
           await db.get_course_works([call.data[8:]])])  # добавление курсачей будет в callback_query_work
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, f'Курсовые работы по теме *{call.data[8:]}*', reply_markup=markup,
@@ -162,13 +162,15 @@ async def callback_show_course_works_by_subject(call):
 @bot.callback_query_handler(func=lambda call: call.data == 'sub_to_add')
 async def callback_show_subjects_to_add(call):
     db = Database()
-    my_subjects_ = []
+    my_subjects_ = (await db.get_mentors(call.from_user.id))[0]['subjects']
 
-    for mentor in await db.get_mentors():
-        if mentor['chat_id'] == call.from_user.id:
-            if mentor['subjects'] is not None:
-                my_subjects_ = mentor['subjects']
-            break
+    # for mentor in await db.get_mentors():
+    #     if mentor['chat_id'] == call.from_user.id:
+    #         if mentor['subjects'] is not None:
+    #             my_subjects_ = mentor['subjects']
+    #         break
+    if not my_subjects_:
+        my_subjects_ = []
 
     subjects_to_add = await db.get_subjects()
 
@@ -191,11 +193,11 @@ async def callback_show_subjects_to_add(call):
 async def callback_add_subject(call):
     db = Database()
 
-    my_id = None
-    for mentor in await db.get_mentors():
-        if mentor['chat_id'] == call.from_user.id:
-            my_id = mentor['id']
-            break
+    my_id = (await db.get_mentors(call.from_user.id))[0]['id']
+    # for mentor in await db.get_mentors():
+    #     if mentor['chat_id'] == call.from_user.id:
+    #         my_id = mentor['id']
+    #         break
 
     await db.add_mentor_subjects(my_id, [call.data[8:]])
     await bot.answer_callback_query(call.id)
@@ -205,12 +207,12 @@ async def callback_add_subject(call):
 @bot.callback_query_handler(func=lambda call: call.data == 'sub_to_delete')
 async def callback_show_subjects_to_delete(call):
     db = Database()
-    my_subjects_ = []
+    my_subjects_ = (await db.get_mentors(call.from_user.id))[0]['subjects']
 
-    for mentor in await db.get_mentors():
-        if mentor['chat_id'] == call.from_user.id:
-            my_subjects_ = mentor['subjects']
-            break
+    # for mentor in await db.get_mentors():
+    #     if mentor['chat_id'] == call.from_user.id:
+    #         my_subjects_ = mentor['subjects']
+    #         break
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
@@ -222,12 +224,12 @@ async def callback_show_subjects_to_delete(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('sub_delete_'))
 async def callback_add_subject(call):
     db = Database()
-    my_id = None
+    my_id = (await db.get_mentors(call.from_user.id))[0]['id']
 
-    for mentor in await db.get_mentors():
-        if mentor['chat_id'] == call.from_user.id:
-            my_id = mentor['id']
-            break
+    # for mentor in await db.get_mentors():
+    #     if mentor['chat_id'] == call.from_user.id:
+    #         my_id = mentor['id']
+    #         break
 
     await db.remove_mentor_subject(my_id, call.data[11:])
     await bot.answer_callback_query(call.id)
@@ -254,13 +256,15 @@ async def set_subjects(message):
 async def my_students(message):
     db = Database()
     # my_students_ = ['st1','st2','st3']
-    my_students_ = []
-    for mentor in await db.get_mentors():
-        if mentor['chat_id'] == message.from_user.id:
-            my_students_ = mentor['students']
-            break
-    if my_students_ is None:
+    # for mentor in await db.get_mentors():
+    #     if mentor['chat_id'] == message.from_user.id:
+    #         my_students_ = mentor['students']
+    #         break
+
+    my_students_ = (await db.get_mentors(message.from_user.id))[0]['students']
+
+    if not my_students_:
         str_my_students_ = 'У Вас нет студентов!'
     else:
-        str_my_students_ = '\n'.join('@'+student['name']+student['course_works'] for student in my_students_)
+        str_my_students_ = '\n'.join('@' + student['name'] + student['course_works'] for student in my_students_)
     await bot.send_message(message.chat.id, f'*Список моих студентов*\n{str_my_students_}', parse_mode='markdown')
