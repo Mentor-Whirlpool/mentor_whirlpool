@@ -138,18 +138,24 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        tasks = []
+        await self.db.execute('INSERT INTO STUDENTS VALUES('
+                              'DEFAULT, %s, %s, %s) '
+                              'ON CONFLICT (CHAT_ID) DO NOTHING ',
+                              # 'UPDATE SET COURSE_WORKS = '
+                              # 'ARRAY_APPEND(EXCLUDED.COURSE_WORKS, '
+                              # 'CAST(%s as BIGINT))',
+                              # (line['name'], line['chat_id'], [work], work,)))
+                              (line['name'], line['chat_id'], [],))
+        stud_id = (await self.get_students(chat_id=line['chat_id']))[0]['id']
         work = (await (await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
-                                             'DEFAULT, %(chat_id)s, '
-                                             '%(subjects)s, %(description)s) '
-                                             'RETURNING ID', line)).fetchone())[0]
-        tasks.append(self.db.execute('INSERT INTO STUDENTS VALUES('
-                                     'DEFAULT, %s, %s, %s) '
-                                     'ON CONFLICT (CHAT_ID) DO '
-                                     'UPDATE SET COURSE_WORKS = '
-                                     'ARRAY_APPEND(EXCLUDED.COURSE_WORKS, '
-                                     'CAST(%s as BIGINT))',
-                                     (line['name'], line['chat_id'], [work], work,)))
+                                             'DEFAULT, %s, %s, %s) '
+                                             'RETURNING ID',
+                                             (stud_id, line['subjects'],
+                                              line['description'],))).fetchone())[0]
+        await self.db.execute('UPDATE STUDENTS SET COURSE_WORKS = '
+                              'ARRAY_APPEND(COURSE_WORKS, CAST(%s as BIGINT)) '
+                              'WHERE ID = %s', (work, stud_id,))
+        tasks = []
         for subj in line['subjects']:
             tasks.append(self.add_subject(subj))
         await gather(*tasks)
@@ -377,7 +383,7 @@ class Database:
         for i in cursor:
             students = []
             if i[5] is not None:
-                students = [await self.get_students(student=id)[0] for id in i[5]]
+                students = [(await self.get_students(student=id))[0] for id in i[5]]
             line = {
                 'id': i[0],
                 'name': i[1],
