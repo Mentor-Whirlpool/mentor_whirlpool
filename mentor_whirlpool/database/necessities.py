@@ -311,7 +311,7 @@ class Database:
         #                                      student
         await self.db.commit()
 
-    async def readmission_work(self, work):
+    async def readmission_work(self, work_id):
         """
         Copies a line from ACCEPTED table to COURSE_WORKS table
 
@@ -323,15 +323,8 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        student, description = work
-        if description:
-            line = await (await self.db.execute('SELECT * FROM ACCEPTED '
-                                                'WHERE STUDENT = %s AND '
-                                                'DESCRIPTION = %s', work)).fetchone()
-        else:
-            line = await (await self.db.execute('SELECT * FROM ACCEPTED '
-                                                'WHERE STUDENT = %s AND '
-                                                'DESCRIPTION IS NULL', (student,))).fetchone()
+        line = await (await self.db.execute('SELECT * FROM ACCEPTED '
+                                            'WHERE ID = %s', (work_id,))).fetchone()
         await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
                               '%s, %s, %s, %s)',
                               (line[0], line[1], line[2], line[3],))
