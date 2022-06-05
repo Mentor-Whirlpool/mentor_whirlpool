@@ -78,7 +78,7 @@ class Database:
                 'id': i[0],
                 'name': i[1],
                 'chat_id': i[2],
-                'course_works': await self.get_course_works(student=i[3]),
+                'course_works': await self.get_course_works(student=i[2]),
             }
             list.append(line)
         return list
@@ -126,7 +126,6 @@ class Database:
         """
         Adds a new course work to the database
         Adding a course work increments COUNT column in SUBJECTS table
-
         Parameters
         ----------
         line : dict
@@ -172,17 +171,14 @@ class Database:
         """
         Gets all submitted course works that satisfy the argument subject
         Subject may be empty, in this case, return all course works
-
         Parameters
         ----------
         subjects : list
             List of all strings, indicating needed subjects
             If empty, consider all possible subjects needed
-
         Raises
         ------
         DBAccessError whatever
-
         Returns
         ------
         iterable
@@ -226,13 +222,12 @@ class Database:
         import warnings
         warnings.warn('Don\'t use get_student_course_works, use get_course_works with student argument instead')
         id = await self.get_students(chat_id=chat_id_)
-        return await self.get_course_works(id[0]['id'])
+        return await self.get_course_works(id[0]['course_works'][0]['subjects'])
 
     async def modify_course_work(self, line):
         """
         Modifies an existing line in the database, matching 'chat_id' field
         Modifying a course work may update SUBJECTS table if subject is changed
-
         Parameters
         ----------
         line : dict
@@ -265,12 +260,10 @@ class Database:
         """
         Removes a line from COURSE_WORKS table
         Removing a course work decrements COUNT column in SUBJECTS table
-
         Parameters
         ----------
         id : int
             The first column of the table
-
         Raises
         ------
         DBAccessError whatever
@@ -313,7 +306,7 @@ class Database:
         await self.db.execute('DELETE FROM COURSE_WORKS '
                               'WHERE ID = %s', (work_id,))
         await self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1, '
-                              'STUDENTS = ARRAY_APPEND(STUDENTS, CAST(%S AS BIGINT))'
+                              'STUDENTS = ARRAY_APPEND(STUDENTS, CAST(%s AS BIGINT))'
                               'WHERE ID = %s', (line[1], mentor_id,))
         #                                      student
         await self.db.commit()
@@ -330,9 +323,15 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        line = await (await self.db.execute('SELECT * FROM ACCEPTED '
-                                            'WHERE STUDENT = %(student)s AND '
-                                            'DESCRIPTION = %(description)s', work)).fetchone()
+        student, description = work
+        if description:
+            line = await (await self.db.execute('SELECT * FROM ACCEPTED '
+                                                'WHERE STUDENT = %s AND '
+                                                'DESCRIPTION = %s', work)).fetchone()
+        else:
+            line = await (await self.db.execute('SELECT * FROM ACCEPTED '
+                                                'WHERE STUDENT = %s AND '
+                                                'DESCRIPTION IS NULL', (student,))).fetchone()
         await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
                               '%s, %s, %s, %s)',
                               (line[0], line[1], line[2], line[3],))
@@ -358,13 +357,11 @@ class Database:
     async def add_mentor(self, line):
         """
         Adds a new mentor to the database
-
         Parameters
         ----------
         line : dict
             Dict field names are corresponding to MENTORS table column
             lowercase names, types are corresponding
-
         Raises
         ------
         DBAccessError whatever
@@ -402,7 +399,6 @@ class Database:
     async def get_mentors(self, chat_id=None):
         """
         Gets all lines from MENTORS table
-
         Returns
         ------
         iterable
@@ -412,9 +408,9 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         mentors = None
         if chat_id is not None:
-            mentors = await (await self.db.execute('SELECT * FROM MENTORS '
-                                                   'WHERE CHAT_ID = %s',
-                                                   (chat_id,))).fetchall()
+            mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
+                                                    'WHERE CHAT_ID = %s',
+                                                    (chat_id,))).fetchone()]
             if mentors is None:
                 return None  # raise
         else:
@@ -513,7 +509,6 @@ class Database:
     async def get_subjects(self):
         """
         Gets all lines from SUBJECTS table
-
         Returns
         ------
         iterable
@@ -528,7 +523,6 @@ class Database:
     async def add_admin(self, chat_id):
         """
         Adds a line to ADMINS table
-
         Raises
         ------
         DBAccessError whatever
@@ -537,13 +531,12 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('INSERT INTO ADMINS VALUES('
-                              'DEFAULT, %s,', chat_id)
+                              'DEFAULT, %s)', (chat_id,))
         await self.db.commit()
 
     async def get_admins(self):
         """
         Gets all lines from ADMINS table
-
         Returns
         ------
         iterable
@@ -578,12 +571,10 @@ class Database:
     async def remove_admin(self, chat_id):
         """
         Removes a line from ADMINS table
-
         Parameters
         ----------
         chat_id : int
             The first column of the table
-
         Raises
         ------
         DBAccessError whatever
