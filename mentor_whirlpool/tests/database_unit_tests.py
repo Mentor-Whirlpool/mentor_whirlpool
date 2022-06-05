@@ -251,7 +251,7 @@ class TestDatabaseAccepted(asynctest.TestCase):
             self.assertEqual((await self.db.get_accepted(student=work['student']))[0], work)
 
         for work in dbwork:
-            await self.db.readmission_work((work['student'], work['description']))
+            await self.db.readmission_work(work['id'])
 
         # await self.db.modify_course_work()
 
