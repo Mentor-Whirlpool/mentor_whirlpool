@@ -267,7 +267,7 @@ class Database:
         await gather(*tasks)
         await self.db.commit()
 
-    async def remove_course_work(self, id_field):
+    async def remove_student(self, id_field):
         """
         Removes a line from COURSE_WORKS table
         Removing a course work decrements COUNT column in SUBJECTS table
@@ -283,6 +283,28 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('DELETE FROM COURSE_WORKS '
                               'WHERE STUDENT = %s', (id_field,))
+        await self.db.execute('DELETE FROM STUDENTS '
+                              'WHERE ID = %s', (id_field,))
+        await self.db.commit()
+
+    async def remove_course_work(self, id_field):
+        """
+        Removes a line from COURSE_WORKS table
+        Removing a course work decrements COUNT column in SUBJECTS table
+
+        Parameters
+        ----------
+        id_field : int
+            The first column of the table
+
+        Raises
+        ------
+        DBAccessError whatever
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('DELETE FROM COURSE_WORKS '
+                              'WHERE ID = %s', (id_field,))
         student_relevant = (await (await self.db.execute('SELECT EXISTS('
                                                          'SELECT * FROM COURSE_WORKS '
                                                          'WHERE STUDENT = %s)',
@@ -291,7 +313,6 @@ class Database:
             await self.db.execute('DELETE FROM STUDENTS '
                                   'WHERE CHAT_ID = %s', (id_field,))
         await self.db.commit()
-
     # accepted
     async def accept_work(self, mentor_id, work_id):
         """
