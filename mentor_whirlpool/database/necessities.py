@@ -78,8 +78,8 @@ class Database:
                 'id': i[0],
                 'name': i[1],
                 'chat_id': i[2],
-                'course_works': (await self.get_course_works(student=i[2]) +
-                                 await self.get_accepted(student=i[2])),
+                'course_works': (await self.get_course_works(student=i[0]) +
+                                 await self.get_accepted(student=i[0])),
             }
             list.append(line)
         return list
