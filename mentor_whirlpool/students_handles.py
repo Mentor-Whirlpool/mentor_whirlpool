@@ -112,7 +112,7 @@ async def remove_request(message):
                            reply_markup=markup)
 
 
-@bot.message_handler(func=lambda msg: msg.text == 'Хочу быть ментором')
+@bot.message_handler(func=lambda msg: msg.text == 'Хочу стать ментором')
 async def mentor_resume(message):
     """
     Send a notice to random admin with contact details of requester
@@ -124,8 +124,12 @@ async def mentor_resume(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
+    db = Database()
+    admins = await db.get_admins()
 
-    raise NotImplementedError
+    for admin in admins:
+        admin_chat_id = admin['chat_id']
+        await bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором.")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_request_"))
