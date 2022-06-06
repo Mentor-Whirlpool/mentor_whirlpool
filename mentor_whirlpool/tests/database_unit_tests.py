@@ -99,7 +99,7 @@ class TestDatabaseSimple(asynctest.TestCase):
         for rec in dbmentors:
             rec.pop('id', None)
         self.assertListEqual(mentors, dbmentors)
-        await self.db.remove_mentor(mentors[2]['chat_id'])
+        await self.db.remove_mentor(chat_id=mentors[2]['chat_id'])
         self.assertFalse(await self.db.check_is_mentor(mentors[2]['chat_id']))
         mentors.pop(2)
         dbmentors = await self.db.get_mentors()
@@ -188,11 +188,11 @@ class TestDatabaseSimple(asynctest.TestCase):
         self.assertFalse(await self.db.check_is_admin(76685))
         self.assertFalse(await self.db.check_is_admin(11144))
 
-        self.assertListEqual(admin_chat_id, await self.db.get_admins())
+        self.assertListEqual(admin_chat_id, [adm['chat_id'] for adm in await self.db.get_admins()])
 
         tasks = []
         for chat_id in admin_chat_id:
-            tasks.append(self.db.remove_admin(chat_id))
+            tasks.append(self.db.remove_admin(chat_id=chat_id))
         await gather(*tasks)
 
         for chat_id in admin_chat_id:
@@ -290,7 +290,7 @@ class TestDatabaseFiltered(asynctest.TestCase):
             tasks.append(self.db.add_course_work(work))
         await gather(*tasks)
 
-        filtered_course_works = await self.db.get_course_works(filter_subjects)
+        filtered_course_works = await self.db.get_course_works(subjects=filter_subjects)
         filtered_course_works.sort(key=lambda x: x['chat_id'])
 
         self.assertListEqual(filtered_course_works, answ_filtered_course_works)
@@ -341,4 +341,4 @@ class TestDatabaseMentorSubjects(asynctest.TestCase):
         self.assertListEqual(dbmentors, dbmentors_new)
 
         for ment in dbmentors:
-            self.assertEqual((await self.db.get_mentors(ment['chat_id']))[0], ment)
+            self.assertEqual((await self.db.get_mentors(chat_id=ment['chat_id']))[0], ment)
