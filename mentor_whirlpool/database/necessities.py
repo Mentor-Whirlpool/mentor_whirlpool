@@ -173,7 +173,7 @@ class Database:
             list.append(line)
         return list
 
-    async def get_course_works(self, subjects=[], student=None):
+    async def get_course_works(self, id=None, subjects=[], student=None):
         """
         Gets all submitted course works that satisfy the argument subject
         Subject may be empty, in this case, return all course works
@@ -192,6 +192,10 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        if id is not None:
+            res = [await (await self.db.execute('SELECT * FROM COURSE_WORKS '
+                                                'WHERE ID = %s', (id,))).fetchone()]
+            return await self.assemble_courses_dict(res)
         if subjects:
             query = 'SELECT * FROM COURSE_WORKS WHERE %s = ANY(SUBJECTS)'
             for subj in range(len(subjects) - 1):
@@ -268,7 +272,7 @@ class Database:
         Removing a course work decrements COUNT column in SUBJECTS table
         Parameters
         ----------
-        id : int
+        id_field : int
             The first column of the table
         Raises
         ------
@@ -293,6 +297,13 @@ class Database:
         Moves a line from COURSE_WORKS to ACCEPTED table, increments LOAD
         column in MENTORS table and appends ID into COURSE_WORKS column
         Does nothing if a line exists
+
+        Parameters
+        ----------
+        mentor_id : int
+            database id of the mentor
+        work_id : int
+            database id of the course work
 
         Raises
         ------
@@ -327,6 +338,13 @@ class Database:
         column in MENTORS table and subtracts ID from COURSE_WORKS column
         Does nothing if a line does not exist
 
+        Parameters
+        ----------
+        mentor_id : int
+            database id of the mentor
+        work_id : int
+            database id of the course work
+
         Raises
         ------
         DBAccessError whatever
@@ -354,6 +372,11 @@ class Database:
     async def readmission_work(self, work_id):
         """
         Copies a line from ACCEPTED table to COURSE_WORKS table
+
+        Parameters
+        ----------
+        work_id : int
+            database id of the course work
 
         Raises
         ------
@@ -393,8 +416,8 @@ class Database:
         Parameters
         ----------
         line : dict
-            Dict field names are corresponding to MENTORS table column
-            lowercase names, types are corresponding
+            dict with fields 'name', 'chat_id', 'subjects'
+
         Raises
         ------
         DBAccessError whatever
@@ -429,9 +452,17 @@ class Database:
             list.append(line)
         return list
 
-    async def get_mentors(self, chat_id=None):
+    async def get_mentors(self, id=None, chat_id=None):
         """
         Gets all lines from MENTORS table
+
+        Parameters
+        ----------
+        id : int
+            database id of the mentor
+        chat_id : int
+            telegram chat_id of required mentor
+
         Returns
         ------
         iterable
@@ -471,14 +502,16 @@ class Database:
                                              'WHERE CHAT_ID = %s)',
                                              (chat_id,))).fetchone())[0]
 
-    async def remove_mentor(self, chat_id):
+    async def remove_mentor(self, id=None, chat_id=None):
         """
         Removes a line from MENTORS table
 
         Parameters
         ----------
+        id : int
+            database id of the mentor to delete
         chat_id : int
-            Chat_id of mentor to delete
+            telegram chat_id of mentor to delete
 
         Raises
         ------
@@ -487,8 +520,12 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('DELETE FROM MENTORS '
-                              'WHERE CHAT_ID = %s', (chat_id,))
+        if chat_id is not None:
+            await self.db.execute('DELETE FROM MENTORS '
+                                  'WHERE CHAT_ID = %s', (chat_id,))
+        if id is not None:
+            await self.db.execute('DELETE FROM MENTORS '
+                                  'WHERE ID = %s', (id,))
 
     async def add_mentor_subjects(self, id, subject):
         """
@@ -578,7 +615,7 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         cur = await (await self.db.execute('SELECT * FROM ADMINS')).fetchall()
-        return [adm[1] for adm in cur]
+        return [{'id': adm[0], 'chat_id': adm[1]} for adm in cur]
 
     async def check_is_admin(self, chat_id):
         """
@@ -601,7 +638,7 @@ class Database:
                                              'WHERE CHAT_ID = %s)',
                                              (chat_id,))).fetchone())[0]
 
-    async def remove_admin(self, chat_id):
+    async def remove_admin(self, id=None, chat_id=None):
         """
         Removes a line from ADMINS table
         Parameters
@@ -615,6 +652,10 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('DELETE FROM ADMINS '
-                              'WHERE CHAT_ID = %s', (chat_id,))
+        if id is not None:
+            await self.db.execute('DELETE FROM ADMINS '
+                                  'WHERE ID = %s', (id,))
+        if chat_id is not None:
+            await self.db.execute('DELETE FROM ADMINS '
+                                  'WHERE CHAT_ID = %s', (chat_id,))
         await self.db.commit()
