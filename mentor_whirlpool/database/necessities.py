@@ -78,7 +78,8 @@ class Database:
                 'id': i[0],
                 'name': i[1],
                 'chat_id': i[2],
-                'course_works': await self.get_course_works(student=i[2]),
+                'course_works': (await self.get_course_works(student=i[2]) +
+                                 await self.get_accepted(student=i[2])),
             }
             list.append(line)
         return list
@@ -471,13 +472,19 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         mentors = None
+        if id is not None:
+            mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
+                                                    'WHERE ID = %s',
+                                                    (id,))).fetchone()]
+            if mentors is None:
+                return None  # raise
         if chat_id is not None:
             mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
                                                     'WHERE CHAT_ID = %s',
                                                     (chat_id,))).fetchone()]
             if mentors is None:
                 return None  # raise
-        else:
+        if id is None and chat_id is None:
             mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
         return await self.assemble_mentors_dict(mentors)
 
