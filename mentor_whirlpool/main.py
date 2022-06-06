@@ -12,4 +12,9 @@ import admin_handles
 import support_handles
 import support_request_handler
 
-run(bot.polling())
+async def main():
+    db = Database()
+    await db.initdb()
+    await bot.polling()
+
+run(main())
