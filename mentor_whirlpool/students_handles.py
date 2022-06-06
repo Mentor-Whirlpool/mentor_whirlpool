@@ -29,7 +29,8 @@ async def generic_start(message):
     iterable
         Iterable with all handles texts
     """
-    raise NotImplementedError
+    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Хочу стать ментором']
+    return commands
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Добавить запрос')
