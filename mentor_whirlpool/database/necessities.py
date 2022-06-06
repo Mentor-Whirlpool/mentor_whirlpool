@@ -200,7 +200,7 @@ class Database:
         if subjects:
             query = 'SELECT * FROM COURSE_WORKS WHERE %s = ANY(SUBJECTS)'
             for subj in range(len(subjects) - 1):
-                query += ' AND %s = ANY(SUBJECTS)'
+                query += ' OR %s = ANY(SUBJECTS)'
             res = await (await self.db.execute(query,
                                                tuple(subjects))).fetchall()
             return await self.assemble_courses_dict(res)
