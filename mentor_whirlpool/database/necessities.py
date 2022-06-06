@@ -304,6 +304,8 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         line = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                             'WHERE ID = %s', (work_id,))).fetchone()
+        if line is None:
+            return
         await self.db.execute('INSERT INTO ACCEPTED VALUES('
                               '%s, %s, %s, %s) '
                               'ON CONFLICT (STUDENT) DO NOTHING',
@@ -313,6 +315,38 @@ class Database:
                               'WHERE ID = %s', (work_id,))
         await self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1, '
                               'STUDENTS = ARRAY_APPEND(STUDENTS, CAST(%s AS BIGINT))'
+                              'WHERE ID = %s', (line[1], mentor_id,))
+        #                                      student
+        await self.db.commit()
+
+    async def reject_work(self, mentor_id, work_id):
+        """
+        Disown a student
+
+        Moves a line from ACCEPTED to COURSE_WORK table, decrements LOAD
+        column in MENTORS table and subtracts ID from COURSE_WORKS column
+        Does nothing if a line does not exist
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBDoesNotExist
+        DBAlreadyExists
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        line = await (await self.db.execute('SELECT * FROM ACCEPTED '
+                                            'WHERE ID = %s', (work_id,))).fetchone()
+        if line is None:
+            return
+        await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
+                              '%s, %s, %s, %s)',
+                              (line[0], line[1], line[2], line[3],))
+        #                      id      student  subjects  description
+        await self.db.execute('DELETE FROM ACCEPTED '
+                              'WHERE ID = %s', (work_id,))
+        await self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1, '
+                              'STUDENTS = ARRAY_REMOVE(STUDENTS, CAST(%s AS BIGINT))'
                               'WHERE ID = %s', (line[1], mentor_id,))
         #                                      student
         await self.db.commit()
