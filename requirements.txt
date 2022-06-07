@@ -3,4 +3,4 @@ asyncio
 psycopg[c]
 # для тестов
 coverage
-nose
+nose2
