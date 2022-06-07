@@ -133,35 +133,27 @@ class TestDatabaseSimple(asynctest.TestCase):
         for work in course_works:
             tasks.append(self.db.add_course_work(work))
         await gather(*tasks)
-        for work in course_works:
-            work.pop('name')
-            # TODO: to it with id's, not chat_id's
-            work['student'] = work.pop('chat_id')
-        course_works.sort(key=lambda x: x['student'])
+        course_works.sort(key=lambda x: x['description'])
         dbworks = await self.db.get_course_works()
         for work in dbworks:
             work.pop('id')
-        dbworks.sort(key=lambda x: x['student'])
-        # see todo (:138) above
-        # self.assertListEqual(course_works, dbworks)
+        dbworks.sort(key=lambda x: x['description'])
+        self.assertEqual(len(course_works), len(dbworks))
         dbstudents = await self.db.get_students()
         for stud in names:
             self.assertTrue(self.check_contains_student(stud, dbstudents))
-        to_remove = list(dict.fromkeys([random.randint(0, len(course_works)) for i in range(20)]))
-        # does not affect anything, only needed for source list deletion
-        to_remove.sort()
+        dbworks = await self.db.get_course_works()
+        to_remove = random.sample(dbworks, 10)
         tasks = []
         for rem in to_remove:
-            tasks.append(self.db.remove_course_work(course_works[rem]['student']))
+            tasks.append(self.db.remove_course_work(rem['id']))
         await gather(*tasks)
-        for i in range(len(to_remove)):
-            course_works.pop(to_remove[i] - i)
+        course_works = dbworks
+        for rem in to_remove:
+            course_works.remove(rem)
         dbworks = await self.db.get_course_works()
-        dbworks.sort(key=lambda x: x['student'])
-        for work in dbworks:
-            work.pop('id')
-        # see todo (:138) above
-        # self.assertListEqual(course_works, dbworks)
+        dbworks.sort(key=lambda x: x['description'])
+        self.assertCountEqual(course_works, dbworks)
 
         for student in await self.db.get_students():
             self.assertEqual((await self.db.get_students(student['id']))[0], student)
@@ -245,7 +237,7 @@ class TestDatabaseAccepted(asynctest.TestCase):
 
         mentors_id = [mentor['id'] for mentor in await self.db.get_mentors()]
         for i in range(len(dbwork)):
-            await self.db.accept_work(mentors_id[i % (len(mentors_id) - 1)], dbwork[i]['id'])
+            await self.db.accept_work(mentors_id[i % len(mentors_id)], dbwork[i]['id'])
         mentors = await self.db.get_mentors()
         self.assertListEqual(await self.db.get_accepted(), dbwork)
 
@@ -278,20 +270,26 @@ class TestDatabaseFiltered(asynctest.TestCase):
 
         filter_subjects = random.sample(subjects, 10)
 
-        answ_filtered_course_works = []
-        for course_work in course_works:
-            if filter_subjects in course_work['subjects']:
-                answ_filtered_course_works.append(subjects)
-
-        answ_filtered_course_works.sort(key=lambda x: x['chat_id'])
+        answ_filtered_course_works = [work for work in course_works if any(subj in filter_subjects for subj in work['subjects'])]
+        answ_filtered_course_works.sort(key=lambda x: x['description'])
 
         tasks = []
         for work in course_works:
             tasks.append(self.db.add_course_work(work))
         await gather(*tasks)
 
+        # can only compare subjects and description fields
+        for work in answ_filtered_course_works:
+            work.pop('name')
+            work.pop('chat_id')
+            work['subjects'].sort()
+
         filtered_course_works = await self.db.get_course_works(subjects=filter_subjects)
-        filtered_course_works.sort(key=lambda x: x['chat_id'])
+        filtered_course_works.sort(key=lambda x: x['description'])
+        for work in filtered_course_works:
+            work.pop('id')
+            work.pop('student')
+            work['subjects'].sort()
 
         self.assertListEqual(filtered_course_works, answ_filtered_course_works)
 
