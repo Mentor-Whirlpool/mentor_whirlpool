@@ -1,0 +1,23 @@
+name: Nose2 coverage report
+
+on: [push]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup python
+        uses: actions/setup-python@v3
+        with:
+          python-version: 3.10
+      - name: Setup environment
+        run: python3 -m pip install -r requirements.txt
+      - name: Run tests
+        run: sh mentor_whirlpool/tests/run_coverage.sh
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3.1.0
+        with:
+          name: coverage-html
+          path: mentor_whirlpool/coverage_report
