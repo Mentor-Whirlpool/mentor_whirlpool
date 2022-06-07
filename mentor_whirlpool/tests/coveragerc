@@ -1,0 +1,6 @@
+[report]
+exclude_lines =
+    self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+    
+[html]
+directory = coverage_report
