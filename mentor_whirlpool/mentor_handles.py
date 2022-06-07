@@ -77,6 +77,8 @@ async def callback_query_work(call):
     #         break
 
     await db.accept_work(my_id, call.data[5:])
+    for work in (await db.get_students(student=course_work_info["student"]))[0]['course_works']:
+        await db.remove_course_work(work['id'])
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id,
                            f'Вы взялись за *{course_work_info["description"]}*\nНапишите @{(await db.get_students(student=course_work_info["student"]))[0]["name"]}',
