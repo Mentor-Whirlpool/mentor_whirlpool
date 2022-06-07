@@ -1,6 +1,10 @@
+[run]
+branch = True
+
 [report]
 exclude_lines =
-    self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+    pragma: no cover
+    ^.*self\.db = await psycopg\.AsyncConnection\.connect\(self\.conn\_opts\)
     
 [html]
 directory = coverage_report
