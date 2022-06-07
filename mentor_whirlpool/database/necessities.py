@@ -247,7 +247,7 @@ class Database:
         Parameters
         ----------
         line : dict
-            Dict field names are 'student': int, 'subjects': str[], 'desc': str
+            Dict field names are 'id': int, 'subjects': str[], 'description': str
 
         Raises
         ------
@@ -256,20 +256,20 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        old = await (await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS '
-                                           'WHERE STUDENT = %(chat_id)s',
-                                           line)).fetchone()[0]
+        (old,) = await (await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS '
+                                              'WHERE ID = %(id)s',
+                                              line)).fetchone()
         tasks = []
-        for new in list(set(line['subjects']).difference(old)):
+        for new in set(line['subjects']).difference(old):
             tasks.append(self.add_subject(new))
-        for removed in list(set(old).difference(line['subjects'])):
+        for removed in set(old).difference(line['subjects']):
             tasks.append(self.db.execute('UPDATE SUBJECTS '
                                          'SET COUNT = COUNT - 1 '
                                          'WHERE SUBJECT = %s', (removed,)))
         tasks.append(self.db.execute('UPDATE COURSE_WORKS '
                                      'SET SUBJECTS = %(subjects)s, '
                                      'DESCRIPTION = %(description)s '
-                                     'WHERE CHAT_ID = %(chat_id)s', line))
+                                     'WHERE ID = %(id)s', line))
         await gather(*tasks)
         await self.db.commit()
 
