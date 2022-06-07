@@ -3,6 +3,7 @@ from telebot import types
 from database import Database
 from asyncio import create_task
 from confirm import confirm
+from common import start
 
 
 async def admin_start(message):
@@ -180,7 +181,7 @@ async def callback_delete_subject_info(call):
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('delete_subject_'))
-async def callback_delete_subject_info(call):
+async def callback_delete_subject(call):
     db = Database()
     subject, mentor_chat_id = call.data[15:].split('_')
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
@@ -189,5 +190,35 @@ async def callback_delete_subject_info(call):
     await bot.send_message(mentor_chat_id, f'Тема {subject} успешно удалена админом')
     await bot.send_message(call.from_user.id,
                            f'Тема {subject} успешно удалена у @{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}',
-                          )
+                           )
     await bot.answer_callback_query(call.id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('add_subject_'))
+async def callback_add_subject_info(call):
+    db = Database()
+    mentor_chat_id = call.data[12:]
+
+    force = types.ForceReply(selective=False)
+    await bot.send_message(call.from_user.id, 'Добавлять тему/темы строго в формате \'тема1;тема2;тема3')
+    await bot.send_message(call.from_user.id, f'Добавить тему для {mentor_chat_id}', reply_markup=force)
+    await bot.answer_callback_query(call.id)
+
+
+@bot.message_handler(
+    func=lambda message: message.reply_to_message and message.reply_to_message.text.startswith('Добавить тему для '))
+async def callback_user_add_subject(message):
+    db = Database()
+    mentor_chat_id = message.reply_to_message.text[18:]
+    mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
+    subjects_to_add = message.text.split(';')
+    for subject in subjects_to_add:
+
+        await db.add_subject(subject)
+
+        if not (await db.get_mentors(chat_id=mentor_chat_id))[0]['subjects'] or subject not in \
+                (await db.get_mentors(chat_id=mentor_chat_id))[0]['subjects']:
+            await db.add_mentor_subjects(mentor_id, [subject])
+            await bot.send_message(message.chat.id, f'Тема *{subject}* успешно добавлена', parse_mode='markdown')
+        else:
+            await bot.send_message(message.from_user.id, f'Тема *{subject}* уже была добавлена', parse_mode='markdown')
