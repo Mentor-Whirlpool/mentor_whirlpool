@@ -251,6 +251,58 @@ class TestDatabaseAccepted(asynctest.TestCase):
         # await self.db.modify_course_work()
 
 
+class TestDatabaseRemoveStudent(asynctest.TestCase):
+    async def test_remove_student(self):
+        self.db = Database()
+        await self.db.initdb()
+        await self.db.db.execute('DELETE FROM COURSE_WORKS')
+        await self.db.db.execute('DELETE FROM STUDENTS')
+        await self.db.db.execute('DELETE FROM MENTORS')
+
+        subjects = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        descriptions = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        course_works = [{
+            'name': names[i],
+            'chat_id': i,
+            'subjects': random.sample(subjects, 10),
+            'description': random.choice(descriptions)
+        } for i in range(len(names))]
+        mentors = [{
+            'name': name,
+            'chat_id': chat_id,
+            'subjects': [],
+            'students': [],
+            'load': 0,
+        } for (name, chat_id) in zip(''.join(random.choice(string.ascii_lowercase) for i in range(10) for j in range(100)), range(20000,29999))]
+        tasks = []
+        for work in course_works:
+            tasks.append(self.db.add_course_work(work))
+        for ment in mentors:
+            tasks.append(self.db.add_mentor(ment))
+        await gather(*tasks)
+
+        # accept some
+        mentors = await self.db.get_mentors()
+        await gather(*[self.db.accept_work(random.choice(mentors)['id'], to_accept['id'])
+                       for to_accept in random.sample(await self.db.get_course_works(), 100)])
+
+        students = await self.db.get_students()
+        to_remove = [stud['id'] for stud in random.sample(students, 200)]
+        students = [stud for stud in students if stud['id'] not in to_remove]
+        course_works = [work for work in await self.db.get_course_works() if work['student'] not in to_remove]
+        accepted_works = [work for work in await self.db.get_accepted() if work['student'] not in to_remove]
+        await gather(*[self.db.remove_student(stud) for stud in to_remove])
+        dbstudents = await self.db.get_students()
+        dbstudents.sort(key=lambda x: x['id'])
+        students.sort(key=lambda x: x['id'])
+        dbcourse_works = await self.db.get_course_works()
+        dbcourse_works.sort(key=lambda x: x['id'])
+        course_works.sort(key=lambda x: x['id'])
+        self.assertListEqual(dbstudents, students)
+        self.assertListEqual(dbcourse_works, course_works)
+
+
 class TestDatabaseFiltered(asynctest.TestCase):
     async def test_filter_for_get_course_works(self):
         self.db = Database()
