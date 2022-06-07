@@ -20,10 +20,10 @@ async def admin_start(message):
     iterable
         Iterable with all handles texts
     """
-    return ['Менторы', 'Запросы']
+    return ['Менторы', 'Запросы (админ)']
 
 
-@bot.message_handler(func=lambda msg: msg.text == 'Запросы')
+@bot.message_handler(func=lambda msg: msg.text == 'Запросы (админ)')
 async def course_work(message):
     db = Database()
     course_works = await db.get_course_works()
@@ -77,13 +77,27 @@ async def list_mentors(message):
     """
     db = Database()
     mentors = await db.get_mentors()
+
     for mentor in mentors:
+
         markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton('Выбрать', callback_data='choose_mentor_' + str(mentor['chat_id'])))
+
         if mentor['subjects']:
-            message_subjects = '\n'.join(mentor['subjects'])
+            subjects_count_dict = dict.fromkeys(mentor['subjects'], 0)
+
+            for student in mentor['students']:
+
+                for subject in student['course_works'][0]['subjects']:
+                    if subject in subjects_count_dict:
+                        subjects_count_dict[subject] += 1
+                    else:
+                        subjects_count_dict[subject] = 1
+
+            message_subjects = '\n'.join(f'{k} - {v}' for k, v in subjects_count_dict.items())
         else:
             message_subjects = 'Нет выбранных тем'
+
         await bot.send_message(message.chat.id, f'*@{mentor["name"]}*\n{message_subjects}', reply_markup=markup,
                                parse_mode='markdown')
 
@@ -91,7 +105,7 @@ async def list_mentors(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('choose_mentor_'))
 async def callback_mentors_info(call):
     db = Database()
-    mentor_info = (await db.get_mentors(int(call.data[14:])))[0]
+    mentor_info = (await db.get_mentors(chat_id=int(call.data[14:])))[0]
     # mentor_info = {}
     # for mentor in mentors:
     #     if mentor['id'] == int(call.data[14:]):
@@ -109,8 +123,8 @@ async def callback_mentors_info(call):
     markup.add(edit_students, edit_subjects)
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id,
-                           f'*@{mentor_info["name"]}*\n{message_subjects}\nStudents\n{message_students}',
-                           reply_markup=markup, parse_mode='markdown')
+                           f'@{mentor_info["name"]}\n----Темы----\n{message_subjects}\n----Студенты----\n{message_students}',
+                           reply_markup=markup)
 
 
 # students
@@ -145,10 +159,11 @@ async def callback_add_student(call):
 async def callback_delete_student_info(call):
     db = Database()
     markup = types.InlineKeyboardMarkup(row_width=3)
-
+    test = (await db.get_mentors(chat_id=int(call.data[20:])))[0]['students']
     markup.add(
-        types.InlineKeyboardButton(f'{student["name"]}', callback_data=f'delete_stud_{call.data[14:]}_{student["id"]}')
-        for student in (await db.get_mentors(int(call.data[14:])))[0]['students'])
+        *[types.InlineKeyboardButton(f'{student["name"]}',
+                                     callback_data=f'delete_stud_{call.data[20:]}_{str(student["course_works"][0]["id"])}')
+          for student in (await db.get_mentors(chat_id=int(call.data[20:])))[0]['students']])
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, 'Выберите какого студента удалить', reply_markup=markup)
 
@@ -156,8 +171,10 @@ async def callback_delete_student_info(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('delete_stud_'))
 async def callback_delete_student(call):
     db = Database()
-    mentor_id, student_id = call.data[12:].split('_')
-    db.reject_work(mentor_id, student_id)
+    mentor_id, work_id = call.data[12:].split('_')
+    mentor_id = (await db.get_mentors(chat_id=mentor_id))[0]['id']
+    # await bot.send_message((await db.get_mentors(id=mentor_id))[0]['chat_id'], f'Студент {}')
+    await db.reject_work(mentor_id, work_id)
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, 'Студент удален')
 
