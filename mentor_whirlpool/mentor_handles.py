@@ -189,11 +189,12 @@ async def my_students(message):
 
     mentor_info = (await db.get_mentors(chat_id=message.from_user.id))[0]
     my_students_ = mentor_info['students']
-    # как понять что ментор взял именно эту курсовую студента(у студента же может быть их несколько у разных менторов)
-    # for student in my_students_:
-    #     if
+
     if not my_students_:
         str_my_students_ = 'У Вас нет студентов!'
     else:
-        str_my_students_ = '\n'.join('@' + student['name'] for student in my_students_)
+
+        str_my_students_ = '\n'.join(
+            '@' + student['name'] + ' - ' + student["course_works"][0]["description"] for student
+            in my_students_)
     await bot.send_message(message.chat.id, f'Список моих студентов\n{str_my_students_}')
