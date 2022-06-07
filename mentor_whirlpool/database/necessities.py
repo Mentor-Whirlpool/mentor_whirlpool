@@ -212,7 +212,7 @@ class Database:
         res = await (await self.db.execute('SELECT * FROM COURSE_WORKS')).fetchall()
         return await self.assemble_courses_dict(res)
 
-    async def get_student_course_works(self, chat_id_):
+    async def get_student_course_works(self, chat_id_): # pragma: no cover
         """
         Gets all submitted course works from a specified student
 
