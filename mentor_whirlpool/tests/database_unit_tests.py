@@ -1,19 +1,8 @@
 import asynctest
-from asyncio import gather, sleep
+from asyncio import gather
+from database import Database
 import random
 import string
-from pprint import pprint
-
-from database import Database
-
-"""
-сначала (см. requirements):
-pip install coverage
-pip install nose
-
-для запуска проверки покрытия:
-python3 -m nose --with-coverage --cover-erase tests.database_unit_tests
-"""
 
 
 # fine to test altogether, because different tables are tested
@@ -199,7 +188,7 @@ class TestDatabaseAccepted(asynctest.TestCase):
         await self.db.initdb()
         await self.db.db.execute('DELETE FROM COURSE_WORKS')
         await self.db.db.execute('DELETE FROM STUDENTS')
-        # await self.db.db.execute('DELETE FROM MENTORS')
+        await self.db.db.execute('DELETE FROM MENTORS')
         await self.db.db.execute('DELETE FROM ACCEPTED')
         course_works = [{
             'name': 'Helen',
@@ -251,6 +240,51 @@ class TestDatabaseAccepted(asynctest.TestCase):
         # await self.db.modify_course_work()
 
 
+class TestDatabaseReject(asynctest.TestCase):
+    async def test_accept_course_work(self):
+        self.db = Database()
+        await self.db.initdb()
+        await self.db.db.execute('DELETE FROM COURSE_WORKS')
+        await self.db.db.execute('DELETE FROM STUDENTS')
+        await self.db.db.execute('DELETE FROM MENTORS')
+        await self.db.db.execute('DELETE FROM ACCEPTED')
+
+        subjects = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        descriptions = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        course_works = [{
+            'name': names[i],
+            'chat_id': i,
+            'subjects': random.sample(subjects, 10),
+            'description': random.choice(descriptions)
+        } for i in range(len(names))]
+        mentors = [{
+            'name': name,
+            'chat_id': chat_id,
+            'subjects': [],
+            'students': [],
+            'load': 0,
+        } for (name, chat_id) in zip(''.join(random.choice(string.ascii_lowercase) for i in range(10) for j in range(100)), range(30000,39999))]
+        tasks = [self.db.add_course_work(work) for work in course_works] + [self.db.add_mentor(ment) for ment in mentors]
+        await gather(*tasks)
+        course_works = await self.db.get_course_works()
+
+        # accept some
+        mentors = await self.db.get_mentors()
+        to_accept = random.sample(course_works, 100)
+        await gather(*[self.db.accept_work(mentors[i]['id'], work['id'])
+                       for (i, work) in enumerate(to_accept)])
+
+        # reject some of those
+        to_reject = to_accept[:50]
+        await gather(*[self.db.reject_work(mentors[i]['id'], to_reject[i]['id']) for i in range(len(to_reject))])
+        expected_works = [work for work in course_works if work not in to_accept or work in to_reject]
+        expected_works.sort(key=lambda x: x['id'])
+        dbworks = await self.db.get_course_works()
+        dbworks.sort(key=lambda x: x['id'])
+        self.assertListEqual(expected_works, dbworks)
+
+
 class TestDatabaseRemoveStudent(asynctest.TestCase):
     async def test_remove_student(self):
         self.db = Database()
@@ -275,11 +309,7 @@ class TestDatabaseRemoveStudent(asynctest.TestCase):
             'students': [],
             'load': 0,
         } for (name, chat_id) in zip(''.join(random.choice(string.ascii_lowercase) for i in range(10) for j in range(100)), range(20000,29999))]
-        tasks = []
-        for work in course_works:
-            tasks.append(self.db.add_course_work(work))
-        for ment in mentors:
-            tasks.append(self.db.add_mentor(ment))
+        tasks = [self.db.add_course_work(work) for work in course_works] + [self.db.add_mentor(ment) for ment in mentors]
         await gather(*tasks)
 
         # accept some
