@@ -340,3 +340,38 @@ class TestDatabaseMentorSubjects(asynctest.TestCase):
 
         for ment in dbmentors:
             self.assertEqual((await self.db.get_mentors(chat_id=ment['chat_id']))[0], ment)
+
+
+class TestDatabaseModifyCourseWork(asynctest.TestCase):
+    async def test_modify_course_work(self):
+        self.db = Database()
+        await self.db.initdb()
+        await self.db.db.execute('DELETE FROM STUDENTS')
+        await self.db.db.execute('DELETE FROM COURSE_WORKS')
+
+        subjects = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        descriptions = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        course_works = [{
+            'name': names[i],
+            'chat_id': i,
+            'subjects': random.sample(subjects, 10),
+            'description': random.choice(descriptions)
+        } for i in range(len(names))]
+        tasks = []
+        for work in course_works:
+            tasks.append(self.db.add_course_work(work))
+        await gather(*tasks)
+
+        course_works = await self.db.get_course_works()
+        to_modify = random.sample(course_works, 100)
+        for work in course_works:
+            if work not in to_modify:
+                continue
+            work['subjects'] = random.sample(subjects, 9)
+            work['description'] = random.choice(descriptions)
+            await self.db.modify_course_work(work)
+        new_works = await self.db.get_course_works()
+        course_works.sort(key=lambda x: x['id'])
+        new_works.sort(key=lambda x: x['id'])
+        self.assertListEqual(course_works, new_works)
