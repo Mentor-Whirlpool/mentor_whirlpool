@@ -3,7 +3,7 @@ from telebot import types
 from database import Database
 from asyncio import create_task
 from confirm import confirm
-from common import start
+
 
 
 async def admin_start(message):
@@ -63,7 +63,7 @@ async def list_mentors(message):
                     if subject in subjects_count_dict:
                         subjects_count_dict[subject] += 1
                     else:
-                        subjects_count_dict[subject] = 1
+                        continue
 
             message_subjects = '\n'.join(f'{k} - {v}' for k, v in subjects_count_dict.items())
         else:
@@ -130,7 +130,6 @@ async def callback_add_student(call):
 async def callback_delete_student_info(call):
     db = Database()
     markup = types.InlineKeyboardMarkup(row_width=3)
-    test = (await db.get_mentors(chat_id=int(call.data[20:])))[0]['students']
     markup.add(
         *[types.InlineKeyboardButton(f'{student["name"]}',
                                      callback_data=f'delete_stud_{call.data[20:]}_{str(student["course_works"][0]["id"])}_{student["id"]}')
@@ -186,7 +185,7 @@ async def callback_delete_subject(call):
     subject, mentor_chat_id = call.data[15:].split('_')
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
 
-    await db.remove_mentor_subject(mentor_id, call.data[11:])
+    await db.remove_mentor_subject(mentor_id, subject)
     await bot.send_message(mentor_chat_id, f'Тема {subject} успешно удалена админом')
     await bot.send_message(call.from_user.id,
                            f'Тема {subject} успешно удалена у @{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}',
