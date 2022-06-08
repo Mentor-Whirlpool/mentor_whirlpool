@@ -137,33 +137,32 @@ async def callback_add_student(call):
     'Добавить студента для '))
 async def callback_user_add_subject(message):
     await bot.send_message(message.chat.id, f'Feature in development')
-    # db = Database()
-    # mentor_chat_id, subject = message.reply_to_message.text[25:].split()
-    # mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
-    # student_name, course_work_name = message.text.strip()[1:].split(';')
-    #
-    # for subject in subjects_to_add:
-    #
-    #     await db.add_subject(subject)
-    #
-    #     if not (await db.get_mentors(chat_id=mentor_chat_id))[0]['subjects'] or subject not in \
-    #             (await db.get_mentors(chat_id=mentor_chat_id))[0]['subjects']:
-    #         await db.add_mentor_subjects(mentor_id, [subject])
-    #         await bot.send_message(message.chat.id, f'Тема *{subject}* успешно добавлена', parse_mode='markdown')
-    #     else:
-    #         await bot.send_message(message.from_user.id, f'Тема *{subject}* уже была добавлена', parse_mode='markdown')
+    db = Database()
+    mentor_chat_id, subject = message.reply_to_message.text[25:].split()
+    mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
+    student_name, course_work_name = message.text.strip()[1:].split(';')
 
+    student_id = None
+    student_chat_id = None
+    for student in await db.get_students():
+        if student['name'] == student_name:
+            student_chat_id = student['chat_id']
+            student_id = student['id']
+            break
 
-# для ввода от пользователя
-#     force = types.ForceReply(selective=False)
-#     print('fff')
-#     await bot.send_message(message.chat.id, 'test', reply_markup=force)
-#
-#
-# @bot.message_handler(func=lambda message: message.reply_to_message and message.reply_to_message.text.startswith('test'))
-# async def answ(message):
-#     db = Database()
-#     print(message.text)
+    if student_chat_id:
+        await db.add_course_work(
+            {'name': student_name, 'chat_id': student_chat_id, 'subjects': [subject], 'description': course_work_name})
+
+        await db.accept_work(mentor_id, (await db.get_course_works(student=student_id))[0]['id'])
+        await bot.send_message(message.chat.id,
+                               f'Студен {student_name} добавлен к ментору {(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}')
+        await bot.send_message(mentor_id, f'Студент @{student_name} привязан к Вам админом')
+        await bot.send_message(student_chat_id,
+                               f'@{(await db.get_mentors(chat_id=mentor_id))[0]["name"]} привязан к Вам админом')
+    else:
+        await bot.send_message(message.chat.id,
+                               f'Студен {student_name} NOT FOUND')
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('delete_student_info_'))
