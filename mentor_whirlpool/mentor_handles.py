@@ -234,7 +234,15 @@ async def request_support(message):
         A pyTelegramBotAPI Message type class
     """
     db = Database()
-    await db.add_support_request(message.chat.id, message.from_user.username)
-    for chat_id in await db.get_supports():
-        await bot.send_message(chat_id, 'Пользователю нужна помощь')
-    await bot.send_message(message.chat.id, 'Ждите ответ поддержки')
+    if not await db.get_support_requests(chat_id=message.chat.id):
+        await db.add_support_request({
+            'chat_id': message.chat.id,
+            'name': message.from_user.username,
+            'issue': None,
+        })
+        for chat_id in [rec['chat_id'] for rec in await db.get_supports()]:
+            await bot.send_message(chat_id, 'Пользователю нужна помощь')
+        await bot.send_message(message.chat.id, 'Ждите ответ поддержки')
+    else:
+        await bot.send_message(message.chat.id, 'Вы уже отправили запрос. Ждите ответ поддержки')
+
