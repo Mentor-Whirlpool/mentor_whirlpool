@@ -7,6 +7,10 @@ from asyncio import gather, create_task
 
 # from gettext import translation
 
+from confirm import confirm
+from database import Database
+
+
 # strings = translation('mentor', localedir='locales', languages=['RU']).gettext
 
 
@@ -216,3 +220,21 @@ async def my_students(message):
             for student in my_students_)
     await bot.send_message(message.chat.id,
                            f'Список моих студентов\n{str_my_students_}')
+
+
+@bot.message_handler(func=lambda msg: msg.text == 'Поддержка')
+async def request_support(message):
+    """
+    Send a notice to all supports
+    Add new record to support_requests table with db.add_support_request(chat_id, name)
+
+    Parameters
+    ----------
+    message : telebot.types.Message
+        A pyTelegramBotAPI Message type class
+    """
+    db = Database()
+    await db.add_support_request(message.chat.id, message.from_user.username)
+    for chat_id in await db.get_supports():
+        await bot.send_message(chat_id, 'Пользователю нужна помощь')
+    await bot.send_message(message.chat.id, 'Ждите ответ поддержки')
