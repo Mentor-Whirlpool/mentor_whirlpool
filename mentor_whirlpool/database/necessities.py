@@ -804,7 +804,7 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('INSERT INTO SUPPORT_REQUESTS VALUES('
-                              'DEFAULT, %(chat_id)s, %(name)s, %(issue)s)',
+                              'DEFAULT, %(chat_id)s, %(name)s, %(issue)s, NULL)',
                               line)
         await self.db.commit()
 
@@ -826,12 +826,15 @@ class Database:
     async def assemble_support_requests_dict(self, cursor):
         list = []
         for i in cursor:
+            support = None
+            if i[4] is not None:
+                support = await self.get_supports(i[4])
             line = {
                 'id': i[0],
                 'chat_id': i[1],
                 'name': i[2],
                 'issue': i[3],
-                'support': await self.get_supports(i[4]),
+                'support': support,
             }
             list.append(line)
         return list
@@ -867,5 +870,5 @@ class Database:
                                                 'WHERE CHAT_ID = %s',
                                                 (chat_id,))).fetchone()]
         if res is None:
-            res = await (await self.db.execute('SELECT * FROM SUPPORTS')).fetchall()
+            res = await (await self.db.execute('SELECT * FROM SUPPORT_REQUESTS')).fetchall()
         return await self.assemble_support_requests_dict(res)
