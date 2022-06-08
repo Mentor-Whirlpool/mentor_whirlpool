@@ -11,7 +11,7 @@ class TestDatabaseSimple(asynctest.TestCase):
         self.db = Database()
         await self.db.initdb()
         expected_tables = [('students',), ('course_works',), ('accepted',), ('subjects',),
-                           ('mentors',), ('admins',)]
+                           ('mentors',), ('admins',), ('supports',), ('support_requests',),]
         # executemany is screwed
         for table in expected_tables:
             exists = await (await self.db.db.execute("""
@@ -180,6 +180,53 @@ class TestDatabaseSimple(asynctest.TestCase):
             self.assertFalse(await self.db.check_is_admin(chat_id))
 
         self.assertListEqual([], await self.db.get_admins())
+
+    async def test_add_remove_support(self):
+        self.db = Database()
+        await self.db.initdb()
+        await self.db.db.execute('DELETE FROM SUPPORTS')
+
+        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        supports = [{
+                'chat_id': chat_id,
+                'name': random.choice(names),
+            } for chat_id in range(0, 1000)]
+        await gather(*[self.db.add_support(supp) for supp in supports])
+
+        dbsupports = await self.db.get_supports()
+        for supp in dbsupports:
+            supp.pop('id')
+        supports.sort(key=lambda x: x['chat_id'])
+        dbsupports.sort(key=lambda x: x['chat_id'])
+        self.assertListEqual(supports, dbsupports)
+
+        dbsupports_chatid_filter = [(await self.db.get_supports(chat_id=supp['chat_id']))[0] for supp in supports]
+        for supp in dbsupports_chatid_filter:
+            supp.pop('id')
+        dbsupports_chatid_filter.sort(key=lambda x: x['chat_id'])
+        self.assertListEqual(supports, dbsupports_chatid_filter)
+
+        dbsupports = await self.db.get_supports()
+        dbsupports_id_filter = [(await self.db.get_supports(supp['id']))[0] for supp in dbsupports]
+        dbsupports.sort(key=lambda x: x['chat_id'])
+        dbsupports_id_filter.sort(key=lambda x: x['chat_id'])
+        self.assertListEqual(dbsupports, dbsupports_id_filter)
+
+        to_remove = random.sample(dbsupports, 100)
+        await gather(*[self.db.remove_support(supp['id']) for supp in to_remove])
+        supports = [supp for supp in dbsupports if supp not in to_remove]
+        supports.sort(key=lambda x: x['chat_id'])
+        dbsupports = await self.db.get_supports()
+        dbsupports.sort(key=lambda x: x['chat_id'])
+        self.assertListEqual(supports, dbsupports)
+
+        to_remove = random.sample(dbsupports, 100)
+        await gather(*[self.db.remove_support(chat_id=supp['chat_id']) for supp in to_remove])
+        supports = [supp for supp in dbsupports if supp not in to_remove]
+        supports.sort(key=lambda x: x['chat_id'])
+        dbsupports = await self.db.get_supports()
+        dbsupports.sort(key=lambda x: x['chat_id'])
+        self.assertListEqual(dbsupports, supports)
 
 
 class TestDatabaseAccepted(asynctest.TestCase):
