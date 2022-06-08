@@ -36,6 +36,11 @@ class Database:
         LOAD(INT) | STUDENTS (BIGINT[])
                 Table "ADMINS":
         ID(PRIMARY KEY) | CHAT_ID (BIGINT NOT NULL UNIQUE)
+                Table "SUPPORTS":
+        ID(PRIMARY KEY) | CHAT_ID (BIGINT NOT NULL UNIQUE) |
+        REQUESTS(BIGINT REFERENCES SUPPORT_REQUESTS(ID))
+                Table "SUPPORT_REQUESTS":
+        ID(PRIMARY KEY) | REQUESTER (BIGINT NOT NULL REFERENCES )
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
@@ -67,7 +72,17 @@ class Database:
                                      'STUDENTS BIGINT[])'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS ADMINS('
                                      'ID BIGSERIAL PRIMARY KEY,'
-                                     'CHAT_ID BIGINT NOT NULL UNIQUE)'))
+                                     'CHAT_ID BIGINT NOT NULL UNIQUE)'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS SUPPORTS('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'CHAT_ID BIGINT NOT NULL UNIQUE,'
+                                     'NAME TEXT NOT NULL,'
+                                     'REQUESTS BIGINT REFERENCES SUPPORT_REQUESTS(ID) DEFERRABLE INITIALLY DEFERRED)'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS SUPPORT_REQUESTS('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'CHAT_ID BIGINT NOT NULL,'
+                                     'NAME TEXT NOT NULL,'
+                                     'ISSUE TEXT)'))
         await self.db.commit()
 
     # students
@@ -688,3 +703,169 @@ class Database:
             await self.db.execute('DELETE FROM ADMINS '
                                   'WHERE CHAT_ID = %s', (chat_id,))
         await self.db.commit()
+
+    # supports
+    async def add_support(self, line):
+        """
+        Adds a support to the database
+
+        Parameters
+        ----------
+        line : dict
+            A dictionary with keys 'chat_id' and 'name'
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBAlreadyExists
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('INSERT INTO SUPPORTS VALUES('
+                              'DEFAULT, %(chat_id)s, %(name)s, ARRAY[]::BIGINT)'
+                              'ON CONFLICT DO NOTHING', line)
+        await self.db.commit()
+
+    async def remove_support(self, id_field=None, chat_id=None):
+        """
+        Removes a support from the database
+
+        Parameters
+        ----------
+        id_field : (optional) int
+            Database id of the support
+        chat_id : (optional) int
+            Chat ID of the support
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        if id_field is not None:
+            await self.db.execute('DELETE FROM SUPPORTS '
+                                  'WHERE ID = %s', (id_field,))
+        if chat_id is not None:
+            await self.db.execute('DELETE FROM SUPPORTS '
+                                  'WHERE CHAT_ID = %s', (chat_id,))
+        await self.db.commit()
+
+    async def assemble_supports_dict(self, res):
+        list = []
+        for i in res:
+            line = {
+                'id': i[0],
+                'chat_id': i[1],
+                'name': i[2],
+                'requests': [self.get_support_requests(req) for req in i[3]],
+            }
+            list.append(line)
+        return list
+
+    async def get_supports(self, id_field=None, chat_id=None):
+        """
+        If any arguments are supplied, they are used as a key to find
+        a specific support. Otherwise, fetches all supports from the database
+
+        Parameters
+        ----------
+        id_field : (optional) int
+            Database id of the support
+        chat_id : (optional) int
+            Chat ID of the support
+
+        Returns
+        -------
+        list(dict)
+            A list of dictionaries with keys: 'id' : int, 'chat_id' : int,
+            'name' : str, 'requests' : list(dict)
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        res = None
+        if id_field is not None:
+            res = [await (await self.db.execute('SELECT * FROM SUPPORTS '
+                                                'WHERE ID = %s',
+                                                (id_field,))).fetchone()]
+        if chat_id is not None:
+            res = [await (await self.db.execute('SELECT * FROM SUPPORTS '
+                                                'WHERE CHAT_ID = %s',
+                                                (chat_id,))).fetchone()]
+        if res is None:
+            res = await (await self.db.execute('SELECT * FROM SUPPORTS')).fetchall()
+        return await self.assemble_supports_dict(res)
+
+    async def add_support_request(self, line):
+        """
+        Adds a support request to the database
+
+        Parameters
+        ----------
+        line : dict
+            Dictionary with keys: 'chat_id' : int, 'name' : str and
+            'issue' : str or None
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('INSERT INTO SUPPORT_REQUESTS VALUES('
+                              'DEFAULT, %(chat_id)s, %(name)s, %(issue)s)',
+                              line)
+        await self.db.commit()
+
+    async def remove_support_request(self, id_field=None):
+        """
+        Removes a support request from the database
+
+        Parameters
+        ----------
+        id_field : int
+            Database id of the support request
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('DELETE FROM SUPPORT_REQUESTS '
+                              'WHERE ID = %s', (id_field,))
+        await self.db.commit()
+
+    async def assemble_support_requests_dict(self, cursor):
+        list = []
+        for i in cursor:
+            line = {
+                'id': i[0],
+                'chat_id': i[1],
+                'name': i[2],
+                'issue': i[3],
+            }
+            list.append(line)
+        return list
+
+    async def get_support_requests(self, id_field=None, chat_id=None):
+        """
+        If any arguments are supplied, they are used as a key to find
+        a specific support request. Otherwise, fetches all supports requests
+        from the database
+
+        Parameters
+        ----------
+        id_field : (optional) int
+            Database id of the support request
+        chat_id : (optional) int
+            Chat ID of the requester
+
+        Returns
+        -------
+        list(dict)
+            A list of dictionaries with keys: 'id' : int, 'chat_id' : int,
+            'name' : str, 'issue' : str or None
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        res = None
+        if id_field is not None:
+            res = [await (await self.db.execute('SELECT * FROM SUPPORT_REQUESTS '
+                                                'WHERE ID = %s',
+                                                (id_field,))).fetchone()]
+        if chat_id is not None:
+            res = [await (await self.db.execute('SELECT * FROM SUPPORT_REQUESTS '
+                                                'WHERE CHAT_ID = %s',
+                                                (chat_id,))).fetchone()]
+        if res is None:
+            res = await (await self.db.execute('SELECT * FROM SUPPORTS')).fetchall()
+        return await self.assemble_support_requests_dict(res)
