@@ -47,29 +47,40 @@ class Database:
         await gather(self.db.execute('CREATE TABLE IF NOT EXISTS STUDENTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
-                                     'CHAT_ID BIGINT NOT NULL UNIQUE,'
-                                     'COURSE_WORKS BIGINT[])'),
+                                     'CHAT_ID BIGINT NOT NULL UNIQUE)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS('
                                      'ID BIGSERIAL PRIMARY KEY,'
-                                     'STUDENT BIGINT NOT NULL,'
-                                     'SUBJECTS TEXT[] NOT NULL,'
-                                     'DESCRIPTION TEXT)'),
-                     self.db.execute('CREATE TABLE IF NOT EXISTS ACCEPTED('
-                                     'ID BIGSERIAL PRIMARY KEY,'
-                                     'STUDENT BIGINT NOT NULL UNIQUE,'
-                                     'SUBJECTS TEXT[] NOT NULL,'
+                                     'STUDENT BIGINT NOT NULL REFERENCES STUDENTS(ID),'
                                      'DESCRIPTION TEXT)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS SUBJECTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'SUBJECT TEXT NOT NULL UNIQUE,'
                                      'COUNT INT)'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS_SUBJECTS('
+                                     'COURSE_WORK BIGINT NOT NULL REFERENCES COURSE_WORKS(ID),'
+                                     'SUBJECT BIGINT NOT NULL REFERENCES SUBJECTS(ID),'
+                                     'UNIQUE(COURSE_WORK, SUBJECT))'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS ACCEPTED('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'STUDENT BIGINT NOT NULL UNIQUE REFERENCES STUDENTS(ID),'
+                                     'DESCRIPTION TEXT)'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS ACCEPTED_SUBJECTS('
+                                     'COURSE_WORK BIGINT NOT NULL REFERENCES ACCEPTED(ID),'
+                                     'SUBJECT BIGINT NOT NULL REFERENCES SUBJECTS(ID),'
+                                     'UNIQUE(COURSE_WORK, SUBJECT))'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
                                      'CHAT_ID BIGINT NOT NULL UNIQUE,'
-                                     'SUBJECTS TEXT[],'
-                                     'LOAD INT,'
-                                     'STUDENTS BIGINT[])'),
+                                     'LOAD INT)'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS_SUBJECTS('
+                                     'MENTOR BIGINT NOT NULL REFERENCES MENTORS(ID),'
+                                     'SUBJECT BIGINT NOT NULL REFERENCES SUBJECTS(ID),'
+                                     'UNIQUE(MENTOR, SUBJECT))'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS_STUDENTS('
+                                     'MENTOR BIGINT NOT NULL REFERENCES MENTORS(ID),'
+                                     'STUDENT BIGINT NOT NULL REFERENCES STUDENTS(ID),'
+                                     'UNIQUE(MENTOR, STUDENT))'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS ADMINS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'CHAT_ID BIGINT NOT NULL UNIQUE)'),
@@ -79,7 +90,7 @@ class Database:
                                      'NAME TEXT NOT NULL)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS SUPPORT_REQUESTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
-                                     'CHAT_ID BIGINT NOT NULL,'
+                                     'CHAT_ID BIGINT NOT NULL UNIQUE,'
                                      'NAME TEXT NOT NULL,'
                                      'ISSUE TEXT,'
                                      'SUPPORT BIGINT REFERENCES SUPPORTS(ID) DEFERRABLE INITIALLY DEFERRED)'))
@@ -99,13 +110,26 @@ class Database:
             list.append(line)
         return list
 
-    async def get_students(self, student=None, chat_id=None):
+    async def get_students(self, id_field=None, chat_id=None, mentor_id=None):
+        """
+        If any arguments are supplied, they are used as a key to find
+        a specific student. Otherwise, fetches all students from the database
+
+        Parameters
+        ----------
+        id_field : int
+            Database ID of specified student
+        chat_id : int
+            Telegram chat ID of specified student
+        mentor_id : int
+            Database ID of a mentor from which to get the students
+        """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         values = []
-        if student is not None:
+        if id_field is not None:
             values = await self.db.execute('SELECT * FROM STUDENTS '
-                                           'WHERE ID = %s', (student,))
+                                           'WHERE ID = %s', (id_field,))
             return await self.assemble_students_dict(await values.fetchall())
         if chat_id is not None:
             values = await self.db.execute('SELECT * FROM STUDENTS '
@@ -129,14 +153,22 @@ class Database:
         ------
         DBAccessError whatever
         DBDoesNotExist
+
+        Returns
+        -------
+        int
+            Database ID of inserted subject
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('INSERT INTO SUBJECTS(SUBJECT, COUNT) '
-                              'VALUES(%s, 1) '
+        await self.db.execute('INSERT INTO SUBJECTS VALUES(DEFAULT, %s, 1) '
                               'ON CONFLICT (SUBJECT) DO '
-                              'UPDATE SET COUNT = EXCLUDED.COUNT + 1', (subject,))
+                              'UPDATE SET COUNT = EXCLUDED.COUNT + 1 ',
+                              (subject,))
+        (id_f,) = await (await self.db.execute('SELECT ID FROM SUBJECTS '
+                                               'WHERE SUBJECT = %s', (subject,))).fetchone()
         await self.db.commit()
+        return id_f
 
     async def add_course_work(self, line):
         """
@@ -152,31 +184,31 @@ class Database:
         ------
         DBAccessError whatever
         DBAlreadyExists
+
+        Returns
+        -------
+        int
+            Database ID of inserted course work
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('INSERT INTO STUDENTS VALUES('
-                              'DEFAULT, %s, %s, %s) '
-                              'ON CONFLICT (CHAT_ID) DO NOTHING ',
-                              # 'UPDATE SET COURSE_WORKS = '
-                              # 'ARRAY_APPEND(EXCLUDED.COURSE_WORKS, '
-                              # 'CAST(%s as BIGINT))',
-                              # (line['name'], line['chat_id'], [work], work,)))
-                              (line['name'], line['chat_id'], [],))
+                              'DEFAULT, %(name)s, %(chat_id)s) '
+                              'ON CONFLICT (CHAT_ID) DO NOTHING',
+                              line)
+        # need to do it separately, otherwise fetchone will hang the runtime on
+        # database not returning anything
         stud_id = (await self.get_students(chat_id=line['chat_id']))[0]['id']
         work = (await (await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
-                                             'DEFAULT, %s, %s, %s) '
+                                             'DEFAULT, %s, %s) '
                                              'RETURNING ID',
-                                             (stud_id, line['subjects'],
-                                              line['description'],))).fetchone())[0]
-        await self.db.execute('UPDATE STUDENTS SET COURSE_WORKS = '
-                              'ARRAY_APPEND(COURSE_WORKS, CAST(%s as BIGINT)) '
-                              'WHERE ID = %s', (work, stud_id,))
-        tasks = []
-        for subj in line['subjects']:
-            tasks.append(self.add_subject(subj))
-        await gather(*tasks)
+                                             (stud_id, line['description'],))).fetchone())[0]
+        subj_ids = await gather(*[self.add_subject(subj) for subj in line['subjects']])
+        await gather(*[self.db.execute('INSERT INTO COURSE_WORKS_SUBJECTS VALUES('
+                                       '%s, %s) ON CONFLICT DO NOTHING', (work, subj,))
+                       for subj in subj_ids])
         await self.db.commit()
+        return work
 
     async def assemble_courses_dict(self, cursor):
         list = []
@@ -184,21 +216,21 @@ class Database:
             line = {
                 'id': i[0],
                 'student': i[1],
-                'subjects': i[2],
-                'description': i[3],
+                'subjects': await self.get_subjects(work_id=i[0]),
+                'description': i[2],
             }
             list.append(line)
         return list
 
-    async def get_course_works(self, id=None, subjects=[], student=None):
+    async def get_course_works(self, id_field=None, subjects=[], student=None):
         """
         Gets all submitted course works that satisfy the argument subject
         Subject may be empty, in this case, return all course works
 
         Parameters
         ----------
-        subjects : list
-            List of all strings, indicating needed subjects
+        subjects : iterable(str)
+            All strings, indicating needed subjects
             If empty, consider all possible subjects needed
 
         Raises
@@ -212,17 +244,21 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        if id is not None:
+        if id_field is not None:
             res = [await (await self.db.execute('SELECT * FROM COURSE_WORKS '
-                                                'WHERE ID = %s', (id,))).fetchone()]
+                                                'WHERE ID = %s', (id_field,))).fetchone()]
             return await self.assemble_courses_dict(res)
         if subjects:
-            query = 'SELECT * FROM COURSE_WORKS WHERE %s = ANY(SUBJECTS)'
-            for subj in range(len(subjects) - 1):
-                query += ' OR %s = ANY(SUBJECTS)'
-            res = await (await self.db.execute(query,
-                                               tuple(subjects))).fetchall()
-            return await self.assemble_courses_dict(res)
+            subj_ids = [cur for (cur,) in
+                        [await (await self.db.execute('SELECT ID FROM SUBJECTS '
+                                                      'WHERE SUBJECT = %s', (subj,))).fetchone()
+                         for subj in subjects]]
+            ids = await (await self.db.execute('SELECT COURSE_WORK FROM COURSE_WORKS_SUBJECTS '
+                                               'WHERE SUBJECT = ANY(%s)', (subj_ids,))).fetchall()
+            works = [await (await self.db.execute('SELECT * FROM COURSE_WORKS '
+                                                  'WHERE ID = %s', (id_f,))).fetchone()
+                     for (id_f,) in ids]
+            return await self.assemble_courses_dict(works)
         if student is not None:
             res = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                                'WHERE STUDENT = %s',
@@ -231,7 +267,7 @@ class Database:
         res = await (await self.db.execute('SELECT * FROM COURSE_WORKS')).fetchall()
         return await self.assemble_courses_dict(res)
 
-    async def get_student_course_works(self, chat_id_): # pragma: no cover
+    async def get_student_course_works(self, chat_id_):  # pragma: no cover
         """
         Gets all submitted course works from a specified student
 
@@ -271,9 +307,13 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        (old,) = await (await self.db.execute('SELECT SUBJECTS FROM COURSE_WORKS '
-                                              'WHERE ID = %(id)s',
-                                              line)).fetchone()
+        old_ids = await (await self.db.execute('SELECT SUBJECT FROM COURSE_WORKS_SUBJECTS '
+                                               'WHERE COURSE_WORK = %(id)s',
+                                               line)).fetchall()
+        old = [subj for (subj,) in
+               [await (await self.db.execute('SELECT SUBJECT FROM SUBJECTS '
+                                             'WHERE ID = %s', (id_f,))).fetchone()
+                for (id_f,) in old_ids]]
         tasks = []
         for new in set(line['subjects']).difference(old):
             tasks.append(self.add_subject(new))
@@ -281,11 +321,22 @@ class Database:
             tasks.append(self.db.execute('UPDATE SUBJECTS '
                                          'SET COUNT = COUNT - 1 '
                                          'WHERE SUBJECT = %s', (removed,)))
-        tasks.append(self.db.execute('UPDATE COURSE_WORKS '
-                                     'SET SUBJECTS = %(subjects)s, '
-                                     'DESCRIPTION = %(description)s '
-                                     'WHERE ID = %(id)s', line))
         await gather(*tasks)
+        subjects = [id_f for (id_f,) in
+                    [await (await self.db.execute('SELECT ID FROM SUBJECTS '
+                                                  'WHERE SUBJECT = %s',
+                                                  (subj,))).fetchone()
+                     for subj in line['subjects']]]
+        await gather(self.db.execute('UPDATE COURSE_WORKS SET '
+                                     'DESCRIPTION = %s '
+                                     'WHERE ID = %s',
+                                     (line['description'], line['id'],)),
+                     self.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS '
+                                     'WHERE COURSE_WORK = %s', (line['id'],)))
+        await gather(*[self.db.execute('INSERT INTO COURSE_WORKS_SUBJECTS VALUES('
+                                       '%s, %s) ON CONFLICT DO NOTHING',
+                                       (line['id'], subj,))
+                       for subj in subjects])
         await self.db.commit()
 
     async def remove_student(self, id_field):
@@ -304,10 +355,24 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('DELETE FROM COURSE_WORKS '
-                              'WHERE STUDENT = %s', (id_field,))
-        await self.db.execute('DELETE FROM STUDENTS '
-                              'WHERE ID = %s', (id_field,))
+        course_works = await (await self.db.execute('SELECT ID FROM COURSE_WORKS '
+                                                    'WHERE STUDENT = %s', (id_field,))).fetchall()
+        accepted = await (await self.db.execute('SELECT ID FROM ACCEPTED '
+                                                'WHERE STUDENT = %s', (id_field,))).fetchall()
+        await gather(self.db.execute('DELETE FROM MENTORS_STUDENTS '
+                                     'WHERE STUDENT = %s', (id_field,)),
+                     *[self.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS '
+                                       'WHERE COURSE_WORK = %s', (cw_id,))
+                       for (cw_id,) in course_works],
+                     *[self.db.execute('DELETE FROM ACCEPTED_SUBJECTS '
+                                       'WHERE COURSE_WORK = %s', (cw_id,))
+                       for (cw_id,) in accepted])
+        await gather(self.db.execute('DELETE FROM COURSE_WORKS '
+                                     'WHERE STUDENT = %s', (id_field,)),
+                     self.db.execute('DELETE FROM ACCEPTED '
+                                     'WHERE STUDENT = %s', (id_field,)),
+                     self.db.execute('DELETE FROM STUDENTS '
+                                     'WHERE ID = %s', (id_field,)))
         await self.db.commit()
 
     async def remove_course_work(self, id_field):
@@ -318,7 +383,7 @@ class Database:
         Parameters
         ----------
         id_field : int
-            The first column of the table
+            Database ID of course work
 
         Raises
         ------
@@ -326,16 +391,25 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        (stud_id,) = await (await self.db.execute('SELECT STUDENT FROM COURSE_WORKS '
+                                                  'WHERE ID = %s', (id_field,))).fetchone()
+        await self.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS '
+                              'WHERE COURSE_WORK = %s', (id_field,))
         await self.db.execute('DELETE FROM COURSE_WORKS '
                               'WHERE ID = %s', (id_field,))
-        student_relevant = (await (await self.db.execute('SELECT EXISTS('
-                                                         'SELECT * FROM COURSE_WORKS '
-                                                         'WHERE STUDENT = %s)',
-                                                         (id_field,))).fetchone())[0]
+        student_relevant = ((await (await self.db.execute('SELECT EXISTS('
+                                                          'SELECT * FROM COURSE_WORKS '
+                                                          'WHERE STUDENT = %s)',
+                                                          (stud_id,))).fetchone())[0] or
+                            (await (await self.db.execute('SELECT EXISTS('
+                                                          'SELECT * FROM ACCEPTED '
+                                                          'WHERE STUDENT = %s)',
+                                                          (stud_id,))).fetchone())[0])
         if not student_relevant:
             await self.db.execute('DELETE FROM STUDENTS '
-                                  'WHERE CHAT_ID = %s', (id_field,))
+                                  'WHERE ID = %s', (stud_id,))
         await self.db.commit()
+
     # accepted
     async def accept_work(self, mentor_id, work_id):
         """
@@ -360,19 +434,24 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         line = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                             'WHERE ID = %s', (work_id,))).fetchone()
+        cw_subj = await (await self.db.execute('SELECT SUBJECT FROM COURSE_WORKS_SUBJECTS '
+                                               'WHERE COURSE_WORK = %s', (work_id,))).fetchall()
         if line is None:
             return
-        await self.db.execute('INSERT INTO ACCEPTED VALUES('
-                              '%s, %s, %s, %s) '
-                              'ON CONFLICT (STUDENT) DO NOTHING',
-                              (line[0], line[1], line[2], line[3],))
-        #                      id      student  subjects  description
-        await self.db.execute('DELETE FROM COURSE_WORKS '
-                              'WHERE ID = %s', (work_id,))
-        await self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1, '
-                              'STUDENTS = ARRAY_APPEND(STUDENTS, CAST(%s AS BIGINT))'
-                              'WHERE ID = %s', (line[1], mentor_id,))
-        #                                      student
+        await gather(self.db.execute('INSERT INTO ACCEPTED VALUES('
+                                     '%s, %s, %s) '
+                                     'ON CONFLICT (STUDENT) DO NOTHING',
+                                     (line[0], line[1], line[2],)),
+                                     # id      student  description
+                     *[self.db.execute('INSERT INTO ACCEPTED_SUBJECTS VALUES('
+                                       '%s, %s) ON CONFLICT DO NOTHING',
+                                       (work_id, subj))
+                       for (subj,) in cw_subj],
+                     self.remove_course_work(line[0]),
+                     self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1 '
+                                     'WHERE ID = %s', (mentor_id,)),
+                     self.db.execute('INSERT INTO MENTORS_STUDENTS VALUES('
+                                     '%s, %s)', (mentor_id, line[1],)))
         await self.db.commit()
 
     async def reject_work(self, mentor_id, work_id):
@@ -400,18 +479,27 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         line = await (await self.db.execute('SELECT * FROM ACCEPTED '
                                             'WHERE ID = %s', (work_id,))).fetchone()
+        cw_subj = await (await self.db.execute('SELECT SUBJECT FROM ACCEPTED_SUBJECTS '
+                                               'WHERE COURSE_WORK = %s', (work_id,))).fetchall() 
         if line is None:
             return
-        await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
-                              '%s, %s, %s, %s)',
-                              (line[0], line[1], line[2], line[3],))
-        #                      id      student  subjects  description
-        await self.db.execute('DELETE FROM ACCEPTED '
-                              'WHERE ID = %s', (work_id,))
-        await self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1, '
-                              'STUDENTS = ARRAY_REMOVE(STUDENTS, CAST(%s AS BIGINT))'
-                              'WHERE ID = %s', (line[1], mentor_id,))
-        #                                      student
+        await gather(self.db.execute('INSERT INTO COURSE_WORKS VALUES('
+                                     '%s, %s, %s)',
+                                     (line[0], line[1], line[2],)),
+                     #                id      student  description
+                     *[self.db.execute('INSERT INTO COURSE_WORKS_SUBJECTS VALUES('
+                                       '%s, %s) ON CONFLICT DO NOTHING',
+                                       (work_id, subj))
+                       for (subj,) in cw_subj],
+                     self.db.execute('DELETE FROM ACCEPTED_SUBJECTS '
+                                     'WHERE COURSE_WORK = %s', (work_id,)),
+                     self.db.execute('DELETE FROM ACCEPTED '
+                                     'WHERE ID = %s', (work_id,)),
+                     self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1 '
+                                     'WHERE ID = %s', (mentor_id,)),
+                     self.db.execute('DELETE FROM MENTORS_STUDENTS '
+                                     'WHERE MENTOR = %s AND '
+                                     'STUDENT = %s', (mentor_id, line[1],)))
         await self.db.commit()
 
     async def readmission_work(self, work_id):
@@ -434,19 +522,26 @@ class Database:
         line = await (await self.db.execute('SELECT * FROM ACCEPTED '
                                             'WHERE ID = %s', (work_id,))).fetchone()
         await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
-                              '%s, %s, %s, %s)',
-                              (line[0], line[1], line[2], line[3],))
+                              '%s, %s, %s)',
+                              (line[0], line[1], line[2],))
         await self.db.commit()
 
-    async def get_accepted(self, subjects=[], student=None):
+    async def get_accepted(self, id_field=None, subjects=[], student=None):
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        if subjects:
-            res = await (await self.db.execute('SELECT * FROM ACCEPTED '
-                                               'WHERE SUBJECTS = ANY(%s)',
-                                               (subjects,))).fetchall()
+        if id_field is not None:
+            res = [await (await self.db.execute('SELECT * FROM ACCEPTED'
+                                                'WHERE ID = %s', (id_field,))).fetchone()]
             return await self.assemble_courses_dict(res)
-        if student:
+        if subjects:
+            ids = [cur for (cur,) in
+                   await (await self.db.execute('SELECT COURSE_WORK FROM COURSE_WORKS_SUBJECTS '
+                                                'WHERE SUBJECT = ANY(%s)', tuple(subjects))).fetchall()]
+            works = [await (await self.db.execute('SELECT * FROM ACCEPTED '
+                                                  'WHERE ID = %s', (id_f,))).fetchone()
+                     for id_f in ids]
+            return await self.assemble_courses_dict(works)
+        if student is not None:
             res = await (await self.db.execute('SELECT * FROM ACCEPTED '
                                                'WHERE STUDENT = %s',
                                                (student,))).fetchall()
@@ -471,28 +566,27 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        tasks = []
-        tasks.append(self.db.execute('INSERT INTO MENTORS VALUES('
-                                     'DEFAULT, %(name)s, %(chat_id)s,'
-                                     '%(subjects)s, 0, NULL)', line))
+        (ment_id,) = await (await self.db.execute('INSERT INTO MENTORS VALUES('
+                                                  'DEFAULT, %(name)s, %(chat_id)s, 0) '
+                                                  'RETURNING ID', line)).fetchone()
+        subj_ids = []
         if line['subjects'] is not None:
-            for subj in line['subjects']:
-                tasks.append(self.add_subject(subj))
-        await gather(*tasks)
+            subj_ids = await gather(*[self.add_subject(subj) for subj in line['subjects']])
+        await gather(*[self.db.execute('INSERT INTO MENTORS_SUBJECTS VALUES('
+                                       '%s, %s) ON CONFLICT DO NOTHING',
+                                       (ment_id, subj,)) for subj in subj_ids])
         await self.db.commit()
 
     async def assemble_mentors_dict(self, cursor):
         list = []
         for i in cursor:
-            students = []
-            if i[5] is not None:
-                students = [(await self.get_students(student=id))[0] for id in i[5]]
+            students = await self.get_students(mentor_id=i[0])
             line = {
                 'id': i[0],
                 'name': i[1],
                 'chat_id': i[2],
-                'subjects': i[3],
-                'load': i[4],
+                'subjects': await self.get_subjects(mentor_id=i[0]),
+                'load': i[3],
                 'students': students,
             }
             list.append(line)
@@ -554,13 +648,13 @@ class Database:
                                              'WHERE CHAT_ID = %s)',
                                              (chat_id,))).fetchone())[0]
 
-    async def remove_mentor(self, id=None, chat_id=None):
+    async def remove_mentor(self, id_field=None, chat_id=None):
         """
         Removes a line from MENTORS table
 
         Parameters
         ----------
-        id : int
+        id_field : int
             database id of the mentor to delete
         chat_id : int
             telegram chat_id of mentor to delete
@@ -573,22 +667,26 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         if chat_id is not None:
-            await self.db.execute('DELETE FROM MENTORS '
-                                  'WHERE CHAT_ID = %s', (chat_id,))
-        if id is not None:
-            await self.db.execute('DELETE FROM MENTORS '
-                                  'WHERE ID = %s', (id,))
+            (id_field,) = await (await self.db.execute('SELECT ID FROM MENTORS '
+                                                'WHERE CHAT_ID = %s', (chat_id,))
+                                 ).fetchone()
+        await gather(self.db.execute('DELETE FROM MENTORS_SUBJECTS '
+                                     'WHERE MENTOR = %s', (id_field,)),
+                     self.db.execute('DELETE FROM MENTORS_STUDENTS '
+                                     'WHERE MENTOR = %s', (id_field,)),
+                     self.db.execute('DELETE FROM MENTORS '
+                                     'WHERE ID = %s', (id_field,)))
 
-    async def add_mentor_subjects(self, id, subject):
+    async def add_mentor_subjects(self, id_field, subjects):
         """
-        Appends a string into SUBJECTS array of a mentor with a specified ID
+        Add subjects to mentor
 
         Parameters
         ----------
-        id : int
+        id_field : int
             ID (not chat_id) of mentor to edit
-        subjects : str
-            string of subject
+        subjects : iterable(str)
+            Strings of subjects
 
         Raises
         ------
@@ -597,23 +695,22 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('UPDATE MENTORS '
-                              'SET SUBJECTS = (CASE WHEN SUBJECTS IS NULL THEN %s '
-                              '               ELSE SUBJECTS || %s '
-                              '               END) '
-                              'WHERE ID = %s', (subject, subject, id,))
+        subj_ids = await gather(*[self.add_subject(subj) for subj in subjects])
+        await gather(*[self.db.execute('INSERT INTO MENTORS_SUBJECTS VALUES('
+                                       '%s, %s)', (id_field, subj,)) 
+                       for subj in subj_ids])
         await self.db.commit()
 
-    async def remove_mentor_subject(self, id, subject):
+    async def remove_mentor_subjects(self, id_field, subjects):
         """
         Removes a string from SUBJECTS array of a mentor with a specified ID
 
         Parameters
         ----------
-        id : int
+        id_field : int
             ID (not chat_id) of mentor to edit
-        subjects : str
-            string of subject
+        subjects : iterable(str)
+            strings of subject
 
         Raises
         ------
@@ -622,15 +719,29 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('UPDATE MENTORS '
-                              'SET SUBJECTS = ARRAY_REMOVE(SUBJECTS, %s) '
-                              'WHERE ID = %s', (subject, id,))
+        subj_ids = [await (await self.db.execute('SELECT ID FROM SUBJECTS '
+                                                 'WHERE SUBJECT = %s',
+                                                 (subj,))).fetchone()
+                    for subj in subjects]
+        await gather(*[self.db.execute('DELETE FROM MENTORS_SUBJECTS '
+                                       'WHERE MENTOR = %s AND '
+                                       'SUBJECT = %s', (id_field, subj,))
+                       for (subj,) in subj_ids])
         await self.db.commit()
 
     # subjects
-    async def get_subjects(self):
+    async def get_subjects(self, id_field=None, work_id=None, mentor_id=None):
         """
         Gets all lines from SUBJECTS table
+
+        Parameters
+        ---------
+        id_field : int or None
+            Database ID of subject
+        work_id : int or None
+            Database ID of course work to get subjects from
+        mentor_id : int or None
+            Database ID of mentor to get subjects from
 
         Returns
         ------
@@ -639,6 +750,40 @@ class Database:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        if work_id is not None:
+            # this code right here may look horrible and ugly and unreadable
+            # and that may be true, but doing it this way, according to the
+            # testsm is cutting overall time in this function threefold,
+            # leaving most of the time spent asynchronously waiting for
+            # database to respond. this branch can only be improved with
+            # less lists comprehension, but even then that's debatable
+            ids = await (await self.db.execute('SELECT SUBJECT FROM COURSE_WORKS_SUBJECTS '
+                                               'WHERE COURSE_WORK = %s',
+                                               (work_id,))).fetchall()
+            subj_cur = await gather(*[self.db.execute('SELECT SUBJECT FROM SUBJECTS '
+                                                      'WHERE ID = %s', (id_f,))
+                                      for (id_f,) in ids])
+            subjects = await gather(*[subj.fetchone()
+                                      for subj in subj_cur])
+            ids = await (await self.db.execute('SELECT SUBJECT FROM ACCEPTED_SUBJECTS '
+                                               'WHERE COURSE_WORK = %s', (work_id,))).fetchall()
+            subj_cur = await gather(*[self.db.execute('SELECT SUBJECT FROM SUBJECTS '
+                                                      'WHERE ID = %s', (id_f,))
+                                      for (id_f,) in ids])
+            subjects += await gather(*[subj.fetchone()
+                                      for subj in subj_cur])
+            return [subj[0] for subj in subjects]
+        if mentor_id is not None:
+            ids = [cur for (cur,) in
+                   await (await self.db.execute('SELECT SUBJECT FROM MENTORS_SUBJECTS '
+                                                'WHERE MENTOR = %s',
+                                                (mentor_id,))).fetchall()]
+            ids = set(ids)
+            subjects = [(await (await self.db.execute('SELECT SUBJECT FROM SUBJECTS '
+                                                      'WHERE ID = %s', (id_f,))).fetchone())[0]
+                        for id_f in ids]
+            return subjects
+
         cur = await (await self.db.execute('SELECT * FROM SUBJECTS')).fetchall()
         return [subj[1] for subj in cur]
 
@@ -817,7 +962,8 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('INSERT INTO SUPPORT_REQUESTS VALUES('
-                              'DEFAULT, %(chat_id)s, %(name)s, %(issue)s, NULL)',
+                              'DEFAULT, %(chat_id)s, %(name)s, %(issue)s, NULL)'
+                              'ON CONFLICT DO NOTHING',
                               line)
         await self.db.commit()
 
