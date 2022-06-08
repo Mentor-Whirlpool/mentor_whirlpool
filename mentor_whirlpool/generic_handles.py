@@ -1,7 +1,8 @@
 from telegram import bot
 from telebot import types
-from database import Database
 from asyncio import create_task
+
+from database import Database
 from confirm import confirm
 
 
@@ -20,7 +21,7 @@ async def generic_start(message):
     iterable
         Iterable with all handles texts
     """
-    raise NotImplementedError
+    return ['Добавить работу', 'Удалить работу', 'Редактировать работу', 'Хочу быть ментором', 'Поддержка']
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Добавить работу')
@@ -79,3 +80,21 @@ async def mentor_resume(message):
         A pyTelegramBotAPI Message type class
     """
     raise NotImplementedError
+
+
+@bot.message_handler(func=lambda msg: msg.text == 'Поддержка')
+async def request_support(message):
+    """
+    Send a notice to all supports
+    Add new record to support_requests table with db.add_support_request(chat_id, name)
+
+    Parameters
+    ----------
+    message : telebot.types.Message
+        A pyTelegramBotAPI Message type class
+    """
+    db = Database()
+    await db.add_support_request(message.chat.id, message.from_user.username)
+    for chat_id in await db.get_supports():
+        await bot.send_message(chat_id, 'Пользователю нужна помощь')
+    await bot.send_message(message.chat.id, 'Ждите ответ поддержки')
