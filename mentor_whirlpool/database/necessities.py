@@ -38,9 +38,9 @@ class Database:
         ID(PRIMARY KEY) | CHAT_ID (BIGINT NOT NULL UNIQUE)
                 Table "SUPPORTS":
         ID(PRIMARY KEY) | CHAT_ID (BIGINT NOT NULL UNIQUE) |
-        REQUESTS(BIGINT REFERENCES SUPPORT_REQUESTS(ID))
+        REQUESTS(BIGINT[] REFERENCES SUPPORT_REQUESTS(ID))
                 Table "SUPPORT_REQUESTS":
-        ID(PRIMARY KEY) | REQUESTER (BIGINT NOT NULL REFERENCES )
+        ID(PRIMARY KEY) | REQUESTER (BIGINT NOT NULL)
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
@@ -76,13 +76,13 @@ class Database:
                      self.db.execute('CREATE TABLE IF NOT EXISTS SUPPORTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'CHAT_ID BIGINT NOT NULL UNIQUE,'
-                                     'NAME TEXT NOT NULL,'
-                                     'REQUESTS BIGINT REFERENCES SUPPORT_REQUESTS(ID) DEFERRABLE INITIALLY DEFERRED)'),
+                                     'NAME TEXT NOT NULL)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS SUPPORT_REQUESTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'CHAT_ID BIGINT NOT NULL,'
                                      'NAME TEXT NOT NULL,'
-                                     'ISSUE TEXT)'))
+                                     'ISSUE TEXT,'
+                                     'SUPPORT BIGINT REFERENCES SUPPORTS(ID) DEFERRABLE INITIALLY DEFERRED)'))
         await self.db.commit()
 
     # students
@@ -735,7 +735,7 @@ class Database:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('INSERT INTO SUPPORTS VALUES('
-                              'DEFAULT, %(chat_id)s, %(name)s, ARRAY[]::BIGINT)'
+                              'DEFAULT, %(chat_id)s, %(name)s)'
                               'ON CONFLICT DO NOTHING', line)
         await self.db.commit()
 
@@ -767,7 +767,6 @@ class Database:
                 'id': i[0],
                 'chat_id': i[1],
                 'name': i[2],
-                'requests': [self.get_support_requests(req) for req in i[3]],
             }
             list.append(line)
         return list
@@ -788,7 +787,7 @@ class Database:
         -------
         list(dict)
             A list of dictionaries with keys: 'id' : int, 'chat_id' : int,
-            'name' : str, 'requests' : list(dict)
+            'name' : str
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
@@ -845,6 +844,7 @@ class Database:
                 'chat_id': i[1],
                 'name': i[2],
                 'issue': i[3],
+                'support': await self.get_supports(i[4]),
             }
             list.append(line)
         return list
@@ -866,7 +866,7 @@ class Database:
         -------
         list(dict)
             A list of dictionaries with keys: 'id' : int, 'chat_id' : int,
-            'name' : str, 'issue' : str or None
+            'name' : str, 'issue' : str or None, 'support' : dict
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
