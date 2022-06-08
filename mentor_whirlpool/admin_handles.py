@@ -1,9 +1,9 @@
 from telegram import bot
 from telebot import types
 from database import Database
+from re import fullmatch
 from asyncio import create_task
 from confirm import confirm
-
 
 
 async def admin_start(message):
@@ -102,17 +102,56 @@ async def callback_mentors_info(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('edit_students_'))
 async def edit_students(call):
     markup = types.InlineKeyboardMarkup()
-    add = types.InlineKeyboardButton('Добавить студента', callback_data='add_student_' + call.data[14:])
+    add = types.InlineKeyboardButton('Добавить студента', callback_data='add_student_subject_choice_' + call.data[14:])
     delete = types.InlineKeyboardButton('Удалить студента', callback_data='delete_student_info_' + call.data[14:])
     markup.add(add, delete)
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, 'Что сделать со студентами?', reply_markup=markup)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('add_student_'))
-async def callback_add_student(call):
+@bot.callback_query_handler(func=lambda call: call.data.startswith('add_student_subject_choice_'))
+async def callback_add_student_subject_choice(call):
     db = Database()
+    mentor_subjects = (await db.get_mentors(chat_id=call.data[27:]))[0]['subjects']
+
+    markup = types.InlineKeyboardMarkup()
+    markup.add(
+        *[types.InlineKeyboardButton(subject, callback_data='add_student_with_subject_' + subject + call.data[27:]) for
+          subject in mentor_subjects])
+
+    await bot.send_message(call.from_user.id, 'Chose subject to add student', reply_markup=markup)
     await bot.answer_callback_query(call.id)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('add_student_with_subject_'))
+async def callback_add_student(call):
+    subject, mentor_chat_id = call.data[25:].split('_')
+
+    force = types.ForceReply(selective=False)
+    await bot.send_message(call.from_user.id, 'Добавлять студента СТРОГО в формате @student;course_work_name')
+    await bot.send_message(call.from_user.id, f'Добавить студента для {mentor_chat_id} {subject}', reply_markup=force)
+    await bot.answer_callback_query(call.id)
+
+
+@bot.message_handler(func=lambda message: message.reply_to_message and message.reply_to_message.text.startswith(
+    'Добавить студента для '))
+async def callback_user_add_subject(message):
+    await bot.send_message(message.chat.id, f'Feature in development')
+    # db = Database()
+    # mentor_chat_id, subject = message.reply_to_message.text[25:].split()
+    # mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
+    # student_name, course_work_name = message.text.strip()[1:].split(';')
+    #
+    # for subject in subjects_to_add:
+    #
+    #     await db.add_subject(subject)
+    #
+    #     if not (await db.get_mentors(chat_id=mentor_chat_id))[0]['subjects'] or subject not in \
+    #             (await db.get_mentors(chat_id=mentor_chat_id))[0]['subjects']:
+    #         await db.add_mentor_subjects(mentor_id, [subject])
+    #         await bot.send_message(message.chat.id, f'Тема *{subject}* успешно добавлена', parse_mode='markdown')
+    #     else:
+    #         await bot.send_message(message.from_user.id, f'Тема *{subject}* уже была добавлена', parse_mode='markdown')
 
 
 # для ввода от пользователя
@@ -123,6 +162,7 @@ async def callback_add_student(call):
 #
 # @bot.message_handler(func=lambda message: message.reply_to_message and message.reply_to_message.text.startswith('test'))
 # async def answ(message):
+#     db = Database()
 #     print(message.text)
 
 
@@ -195,11 +235,10 @@ async def callback_delete_subject(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('add_subject_'))
 async def callback_add_subject_info(call):
-    db = Database()
     mentor_chat_id = call.data[12:]
 
     force = types.ForceReply(selective=False)
-    await bot.send_message(call.from_user.id, 'Добавлять тему/темы строго в формате \'тема1;тема2;тема3')
+    await bot.send_message(call.from_user.id, 'Добавлять тему/темы СТРОГО в формате тема1;тема2;тема3')
     await bot.send_message(call.from_user.id, f'Добавить тему для {mentor_chat_id}', reply_markup=force)
     await bot.answer_callback_query(call.id)
 
@@ -208,9 +247,10 @@ async def callback_add_subject_info(call):
     func=lambda message: message.reply_to_message and message.reply_to_message.text.startswith('Добавить тему для '))
 async def callback_user_add_subject(message):
     db = Database()
+
     mentor_chat_id = message.reply_to_message.text[18:]
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
-    subjects_to_add = message.text.split(';')
+    subjects_to_add = message.text.strip().split(';')
     for subject in subjects_to_add:
 
         await db.add_subject(subject)
