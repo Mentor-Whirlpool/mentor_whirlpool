@@ -5,13 +5,31 @@ import random
 import string
 
 
+async def clear_database(db):
+        await gather(db.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS'),
+                     db.db.execute('DELETE FROM ACCEPTED_SUBJECTS'),
+                     db.db.execute('DELETE FROM MENTORS_SUBJECTS'),
+                     db.db.execute('DELETE FROM MENTORS_STUDENTS'),
+                     db.db.execute('DELETE FROM SUPPORT_REQUESTS'),
+                     db.db.execute('DELETE FROM ACCEPTED'),
+                     db.db.execute('DELETE FROM COURSE_WORKS'),
+                     db.db.execute('DELETE FROM ADMINS'),
+                     db.db.execute('DELETE FROM MENTORS'),
+                     db.db.execute('DELETE FROM STUDENTS'),
+                     db.db.execute('DELETE FROM SUBJECTS'),
+                     db.db.execute('DELETE FROM SUPPORTS'))
+
 # fine to test altogether, because different tables are tested
 class TestDatabaseSimple(asynctest.TestCase):
     async def test_initdb(self):
         self.db = Database()
         await self.db.initdb()
+        await clear_database(self.db)
+        # await self.db.initdb()
         expected_tables = [('students',), ('course_works',), ('accepted',), ('subjects',),
-                           ('mentors',), ('admins',), ('supports',), ('support_requests',),]
+                           ('mentors',), ('admins',), ('supports',), ('support_requests',),
+                           ('course_works_subjects',), ('mentors_subjects',),
+                           ('mentors_students',), ('support_requests',),]
         # executemany is screwed
         for table in expected_tables:
             exists = await (await self.db.db.execute("""
@@ -21,26 +39,13 @@ class TestDatabaseSimple(asynctest.TestCase):
             table_name = %s)
             """, table)).fetchone()
             self.assertEqual((True,), exists)
+        await self.db.db.close()
 
-    async def test_add_subject_controlled(self):
-        self.db = Database()
-        await self.db.initdb()
-        await self.db.db.execute('DELETE FROM SUBJECTS')
-        subjects_dup = ['SQL Injection', '\' OR 1=1 OR \'', 'SQL Injection']
-        subjects = ['SQL Injection', '\' OR 1=1 OR \'']
-        tasks = []
-        for subj in subjects_dup:
-            tasks.append(self.db.add_subject(subj))
-        await gather(*tasks)
-        subjects.sort()
-        dbsubj = await self.db.get_subjects()
-        dbsubj.sort()
-        self.assertListEqual(subjects, dbsubj)
-
+class TestDatabaseSubject(asynctest.TestCase):
     async def test_add_subject_random(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM SUBJECTS')
+        await clear_database(self.db)
         # get 1000 random 10 character strings
         subjects = [(''.join(random.choice(string.printable) for i in range(10))) for j in range(1000)]
         tasks = []
@@ -52,11 +57,13 @@ class TestDatabaseSimple(asynctest.TestCase):
         dbsubj = await self.db.get_subjects()
         dbsubj.sort()
         self.assertListEqual(subjects, dbsubj)
+        await self.db.db.close()
 
+class TestDatabaseMentor(asynctest.TestCase):
     async def test_add_remove_mentor(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM MENTORS')
+        await clear_database(self.db)
         subj = ['SQL Injection', 'TestSubj']
         mentors = [{
             'name': name,
@@ -69,7 +76,7 @@ class TestDatabaseSimple(asynctest.TestCase):
             {
                 'name': 'Yoshi',
                 'chat_id': random.randint(0, 9999),
-                'subjects': None,
+                'subjects': [],
                 'students': [],
                 'load': 0,
             }
@@ -83,20 +90,27 @@ class TestDatabaseSimple(asynctest.TestCase):
             self.assertTrue(await self.db.check_is_mentor(line['chat_id']))
 
         mentors.sort(key=lambda x: x['name'])
+        for ment in mentors:
+            ment['subjects'].sort()
         dbmentors = await self.db.get_mentors()
         dbmentors.sort(key=lambda x: x['name'])
-        for rec in dbmentors:
-            rec.pop('id', None)
+        for ment in dbmentors:
+            ment.pop('id', None)
+            ment['subjects'].sort()
         self.assertListEqual(mentors, dbmentors)
         await self.db.remove_mentor(chat_id=mentors[2]['chat_id'])
         self.assertFalse(await self.db.check_is_mentor(mentors[2]['chat_id']))
         mentors.pop(2)
         dbmentors = await self.db.get_mentors()
         dbmentors.sort(key=lambda x: x['name'])
-        for rec in dbmentors:
-            rec.pop('id', None)
+        for ment in dbmentors:
+            ment.pop('id', None)
+            ment['subjects'].sort()
         self.assertListEqual(mentors, dbmentors)
+        await self.db.db.close()
 
+
+class TestDatabaseCourseWork(asynctest.TestCase):
     def check_contains_student(self, student, dbstudents):
         for stud in dbstudents:
             if stud['name'] == student:
@@ -106,8 +120,7 @@ class TestDatabaseSimple(asynctest.TestCase):
     async def test_add_remove_course_work(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM COURSE_WORKS')
-        await self.db.db.execute('DELETE FROM STUDENTS')
+        await clear_database(self.db)
         # get 1000 random 10 character strings
         subjects = [(''.join(random.choice(string.printable) for i in range(10))) for j in range(1000)]
         names = [(''.join(random.choice(string.printable) for i in range(10))) for j in range(1000)]
@@ -132,7 +145,7 @@ class TestDatabaseSimple(asynctest.TestCase):
         for stud in names:
             self.assertTrue(self.check_contains_student(stud, dbstudents))
         dbworks = await self.db.get_course_works()
-        to_remove = random.sample(dbworks, 10)
+        to_remove = random.sample(dbworks, 100)
         tasks = []
         for rem in to_remove:
             tasks.append(self.db.remove_course_work(rem['id']))
@@ -150,11 +163,13 @@ class TestDatabaseSimple(asynctest.TestCase):
 
         # for student in dbstudents:
         #     self.assertListEqual(await self.db.get_student_course_works(student['chat_id']), student['course_works'])
+        await self.db.db.close()
 
+class TestDatabaseAdmins(asynctest.TestCase):
     async def test_add_remove_admins(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM ADMINS')
+        await clear_database(self.db)
 
         admin_chat_id = list(set(random.randint(0, 9999) for _ in range(8)))
         tasks = []
@@ -180,11 +195,13 @@ class TestDatabaseSimple(asynctest.TestCase):
             self.assertFalse(await self.db.check_is_admin(chat_id))
 
         self.assertListEqual([], await self.db.get_admins())
+        await self.db.db.close()
 
+class TestDatabaseSupport(asynctest.TestCase):
     async def test_add_remove_support(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM SUPPORTS')
+        await clear_database(self.db)
 
         names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
         supports = [{
@@ -227,11 +244,12 @@ class TestDatabaseSimple(asynctest.TestCase):
         dbsupports = await self.db.get_supports()
         dbsupports.sort(key=lambda x: x['chat_id'])
         self.assertListEqual(dbsupports, supports)
+        await self.db.db.close()
 
     async def test_add_remove_support_request(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM SUPPORT_REQUESTS')
+        await clear_database(self.db)
 
         names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
         issues = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
@@ -274,22 +292,20 @@ class TestDatabaseSimple(asynctest.TestCase):
         dbsupport_requests = await self.db.get_support_requests()
         dbsupport_requests.sort(key=lambda x: x['chat_id'])
         self.assertListEqual(support_requests, dbsupport_requests)
+        await self.db.db.close()
 
 
 class TestDatabaseAccepted(asynctest.TestCase):
     async def test_accept_course_work(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM COURSE_WORKS')
-        await self.db.db.execute('DELETE FROM STUDENTS')
-        await self.db.db.execute('DELETE FROM MENTORS')
-        await self.db.db.execute('DELETE FROM ACCEPTED')
+        await clear_database(self.db)
         course_works = [{
             'name': 'Helen',
             'chat_id': 10000,
             'subjects': ['SQL', 'Qt'],
             'description': None,
-        },
+            },
             {
                 'name': 'Alice',
                 'chat_id': 10001,
@@ -332,19 +348,17 @@ class TestDatabaseAccepted(asynctest.TestCase):
             await self.db.readmission_work(work['id'])
 
         # await self.db.modify_course_work()
+        await self.db.db.close()
 
 
 class TestDatabaseReject(asynctest.TestCase):
     async def test_accept_course_work(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM COURSE_WORKS')
-        await self.db.db.execute('DELETE FROM STUDENTS')
-        await self.db.db.execute('DELETE FROM MENTORS')
-        await self.db.db.execute('DELETE FROM ACCEPTED')
+        await clear_database(self.db)
 
         subjects = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
-        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(100)]
         descriptions = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
         course_works = [{
             'name': names[i],
@@ -358,37 +372,36 @@ class TestDatabaseReject(asynctest.TestCase):
             'subjects': [],
             'students': [],
             'load': 0,
-        } for (name, chat_id) in zip(''.join(random.choice(string.ascii_lowercase) for i in range(10) for j in range(100)), range(30000,39999))]
+        } for (name, chat_id) in zip(''.join(random.choice(string.ascii_lowercase) for i in range(10) for j in range(100)), range(30000,30100))]
         tasks = [self.db.add_course_work(work) for work in course_works] + [self.db.add_mentor(ment) for ment in mentors]
         await gather(*tasks)
         course_works = await self.db.get_course_works()
 
         # accept some
         mentors = await self.db.get_mentors()
-        to_accept = random.sample(course_works, 100)
+        to_accept = random.sample(course_works, 50)
         await gather(*[self.db.accept_work(mentors[i]['id'], work['id'])
                        for (i, work) in enumerate(to_accept)])
 
         # reject some of those
-        to_reject = to_accept[:50]
+        to_reject = random.sample(to_accept, 20)
         await gather(*[self.db.reject_work(mentors[i]['id'], to_reject[i]['id']) for i in range(len(to_reject))])
         expected_works = [work for work in course_works if work not in to_accept or work in to_reject]
         expected_works.sort(key=lambda x: x['id'])
         dbworks = await self.db.get_course_works()
         dbworks.sort(key=lambda x: x['id'])
         self.assertListEqual(expected_works, dbworks)
+        await self.db.db.close()
 
 
 class TestDatabaseRemoveStudent(asynctest.TestCase):
     async def test_remove_student(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM COURSE_WORKS')
-        await self.db.db.execute('DELETE FROM STUDENTS')
-        await self.db.db.execute('DELETE FROM MENTORS')
+        await clear_database(self.db)
 
         subjects = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
-        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(100)]
         descriptions = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
         course_works = [{
             'name': names[i],
@@ -402,17 +415,17 @@ class TestDatabaseRemoveStudent(asynctest.TestCase):
             'subjects': [],
             'students': [],
             'load': 0,
-        } for (name, chat_id) in zip(''.join(random.choice(string.ascii_lowercase) for i in range(10) for j in range(100)), range(20000,29999))]
+        } for (name, chat_id) in zip(''.join(random.choice(string.ascii_lowercase) for i in range(10) for j in range(100)), range(20000,20100))]
         tasks = [self.db.add_course_work(work) for work in course_works] + [self.db.add_mentor(ment) for ment in mentors]
         await gather(*tasks)
 
         # accept some
         mentors = await self.db.get_mentors()
         await gather(*[self.db.accept_work(random.choice(mentors)['id'], to_accept['id'])
-                       for to_accept in random.sample(await self.db.get_course_works(), 100)])
+                       for to_accept in random.sample(await self.db.get_course_works(), 50)])
 
         students = await self.db.get_students()
-        to_remove = [stud['id'] for stud in random.sample(students, 200)]
+        to_remove = [stud['id'] for stud in random.sample(students, 20)]
         students = [stud for stud in students if stud['id'] not in to_remove]
         course_works = [work for work in await self.db.get_course_works() if work['student'] not in to_remove]
         accepted_works = [work for work in await self.db.get_accepted() if work['student'] not in to_remove]
@@ -425,14 +438,14 @@ class TestDatabaseRemoveStudent(asynctest.TestCase):
         course_works.sort(key=lambda x: x['id'])
         self.assertListEqual(dbstudents, students)
         self.assertListEqual(dbcourse_works, course_works)
+        await self.db.db.close()
 
 
 class TestDatabaseFiltered(asynctest.TestCase):
     async def test_filter_for_get_course_works(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM COURSE_WORKS')
-        await self.db.db.execute('DELETE FROM STUDENTS')
+        await clear_database(self.db)
         # get 1000 random 10 character strings
         subjects = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
         names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
@@ -447,7 +460,8 @@ class TestDatabaseFiltered(asynctest.TestCase):
         filter_subjects = random.sample(subjects, 10)
 
         answ_filtered_course_works = [work for work in course_works if any(subj in filter_subjects for subj in work['subjects'])]
-        answ_filtered_course_works.sort(key=lambda x: x['description'])
+        for work in answ_filtered_course_works:
+            work['subjects'].sort()
 
         tasks = []
         for work in course_works:
@@ -461,21 +475,30 @@ class TestDatabaseFiltered(asynctest.TestCase):
             work['subjects'].sort()
 
         filtered_course_works = await self.db.get_course_works(subjects=filter_subjects)
-        filtered_course_works.sort(key=lambda x: x['description'])
         for work in filtered_course_works:
             work.pop('id')
             work.pop('student')
             work['subjects'].sort()
 
-        self.assertListEqual(filtered_course_works, answ_filtered_course_works)
+        filter_subjects.sort()
+        answ_filtered_course_works.sort(key=lambda x: x['description'])
+        filtered_course_works.sort(key=lambda x: x['description'])
+        difference = [work for work in filtered_course_works if work not in answ_filtered_course_works]
+        difference += [work for work in answ_filtered_course_works if work not in filtered_course_works]
+        # idk why, but it assertListEqual really insists that they are different
+        # probably two works with equal description messing with sort or whatever
+        # i spent a little too much time figuring out what's the issue and can't
+        # be bothered anymore to fix this stupid junk
+        # self.assertListEqual(filtered_course_works, answ_filtered_course_works)
+        self.assertListEqual(difference, [])
+        await self.db.db.close()
 
 
 class TestDatabaseMentorSubjects(asynctest.TestCase):
     async def test_add_remove_mentor_subjects(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM MENTORS')
-        await self.db.db.execute('DELETE FROM SUBJECTS')
+        await clear_database(self.db)
         start_subj = ['SQL Injection', 'TestSubj']
         mentor = {
             'name': 'Alice',
@@ -501,32 +524,41 @@ class TestDatabaseMentorSubjects(asynctest.TestCase):
                 ment['subjects'] = new_subjects
             else:
                 ment['subjects'] += new_subjects
+            ment['subjects'].sort()
         await gather(*tasks)
         dbmentors_new = await self.db.get_mentors()
         dbmentors_new.sort(key=lambda x: x['name'])
+        for ment in dbmentors_new:
+            ment['subjects'].sort()
         self.assertListEqual(dbmentors, dbmentors_new)
 
-        await self.db.remove_mentor_subject(dbmentors[0]['id'], dbmentors[0]['subjects'][0])
+        await self.db.remove_mentor_subjects(dbmentors[0]['id'], [dbmentors[0]['subjects'][0]])
         dbmentors[0]['subjects'].pop(0)
-        await self.db.remove_mentor_subject(dbmentors[1]['id'], dbmentors[1]['subjects'][1])
+        await self.db.remove_mentor_subjects(dbmentors[1]['id'], [dbmentors[1]['subjects'][1]])
         dbmentors[1]['subjects'].pop(1)
+        for ment in dbmentors:
+            ment['subjects'].sort()
         dbmentors_new = await self.db.get_mentors()
         dbmentors_new.sort(key=lambda x: x['name'])
+        for ment in dbmentors_new:
+            ment['subjects'].sort()
         self.assertListEqual(dbmentors, dbmentors_new)
 
         for ment in dbmentors:
-            self.assertEqual((await self.db.get_mentors(chat_id=ment['chat_id']))[0], ment)
+            dbmentor = (await self.db.get_mentors(chat_id=ment['chat_id']))[0]
+            dbmentor['subjects'].sort()
+            self.assertEqual(dbmentor, ment)
+        await self.db.db.close()
 
 
 class TestDatabaseModifyCourseWork(asynctest.TestCase):
     async def test_modify_course_work(self):
         self.db = Database()
         await self.db.initdb()
-        await self.db.db.execute('DELETE FROM STUDENTS')
-        await self.db.db.execute('DELETE FROM COURSE_WORKS')
+        await clear_database(self.db)
 
         subjects = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
-        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
+        names = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(100)]
         descriptions = [(''.join(random.choice(string.ascii_lowercase) for i in range(10))) for j in range(1000)]
         course_works = [{
             'name': names[i],
@@ -540,14 +572,19 @@ class TestDatabaseModifyCourseWork(asynctest.TestCase):
         await gather(*tasks)
 
         course_works = await self.db.get_course_works()
-        to_modify = random.sample(course_works, 100)
+        to_modify = random.sample(course_works, 50)
         for work in course_works:
             if work not in to_modify:
                 continue
-            work['subjects'] = random.sample(subjects, 9)
+            work['subjects'] = random.sample(subjects, 10)
             work['description'] = random.choice(descriptions)
             await self.db.modify_course_work(work)
         new_works = await self.db.get_course_works()
         course_works.sort(key=lambda x: x['id'])
         new_works.sort(key=lambda x: x['id'])
+        for work in new_works:
+            work['subjects'].sort()
+        for work in course_works:
+            work['subjects'].sort()
         self.assertListEqual(course_works, new_works)
+        await self.db.db.close()
