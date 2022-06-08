@@ -5,6 +5,8 @@ branch = True
 exclude_lines =
     pragma: no cover
     ^.*self\.db = await psycopg\.AsyncConnection\.connect\(self\.conn\_opts\)
+include =
+    database/*.py
     
 [html]
 directory = coverage_report
