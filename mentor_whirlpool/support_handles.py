@@ -39,8 +39,9 @@ async def check_requests(message):
         requests_list = types.InlineKeyboardMarkup()
         for sup in requests:
             requests_list.add(
-                types.InlineKeyboardButton(text=f'Пользователь {sup[1]}',
-                                           callback_data='cbd_{"c_i": "%s", "un": "%s"}' % tuple(sup))
+                types.InlineKeyboardButton(text=f'Пользователь {sup["name"]}',
+                                           callback_data='cbd_{"c_i": "%s", "un": "%s"}' % (
+                                               sup['chat_id'], sup['name']))
             )
         await bot.send_message(message.chat.id, 'Запросы поддержки:', reply_markup=requests_list, parse_mode='markdown')
     else:
@@ -65,8 +66,10 @@ async def callback_answer_support_request(call):
     chat_id = callback_data['c_i']
     username = callback_data['un']
 
-    if int(chat_id) in [pair[0] for pair in await db.get_support_requests()]:
-        await db.remove_support_request(chat_id)
+    curr_request = await db.get_support_requests(chat_id=chat_id)
+    if curr_request:
+        curr_request = curr_request[0]
+        await db.remove_support_request(curr_request['id'])
         await bot.send_message(chat_id, f'Член поддержки @{call.from_user.username} скоро окажет вам помощь')
 
         new_keyboard = types.InlineKeyboardMarkup()
@@ -74,5 +77,5 @@ async def callback_answer_support_request(call):
 
         await bot.edit_message_reply_markup(call.from_user.id, call.message.id, reply_markup=new_keyboard)
     else:
-        await bot.send_message(call.from_user.id, 'Запрос пользователя больше не актуален')
+        await bot.send_message(call.from_user.id, f'Запрос пользователя @{username} больше не актуален')
     await bot.answer_callback_query(call.id)
