@@ -1,8 +1,10 @@
 from telegram import bot
 from telebot import types
 import json
+from asyncio import create_task
 
 from database import Database
+import support_request_handler
 
 
 async def support_start(message):
@@ -34,8 +36,11 @@ async def check_requests(message):
         A pyTelegramBotAPI Message type class
     """
     db = Database()
-    requests = await db.get_support_requests()
-    if requests:
+    if await db.get_supports(chat_id=message.chat.id):
+        requests = await db.get_support_requests()
+        if not requests:
+            await bot.send_message(message.chat.id, 'Актуальных запросов нет')
+            return
         requests_list = types.InlineKeyboardMarkup()
         for sup in requests:
             requests_list.add(
@@ -43,9 +48,7 @@ async def check_requests(message):
                                            callback_data='cbd_{"c_i": "%s", "un": "%s"}' % (
                                                sup['chat_id'], sup['name']))
             )
-        await bot.send_message(message.chat.id, 'Запросы поддержки:', reply_markup=requests_list, parse_mode='markdown')
-    else:
-        await bot.send_message(message.chat.id, 'Актуальных запросов нет')
+        await bot.send_message(message.chat.id, 'Запросы поддержки:', reply_markup=requests_list, parse_mode='Html')
 
 
 @bot.callback_query_handler(lambda call: call.data.startswith('cbd_'))
@@ -62,20 +65,22 @@ async def callback_answer_support_request(call):
     """
 
     db = Database()
-    callback_data = json.loads(call.data[call.data.index('_') + 1:])
-    chat_id = callback_data['c_i']
-    username = callback_data['un']
+    if await db.get_supports(chat_id=call.from_user.id):
+        callback_data = json.loads(call.data[call.data.index('_') + 1:])
+        chat_id = callback_data['c_i']
+        username = callback_data['un']
 
-    curr_request = await db.get_support_requests(chat_id=chat_id)
-    if curr_request:
+        curr_request = await db.get_support_requests(chat_id=chat_id)
+        if not curr_request:
+            await bot.send_message(call.from_user.id, f'Запрос пользователя @{username} больше не актуален')
+            await bot.answer_callback_query(call.id)
+            return
         curr_request = curr_request[0]
-        await db.remove_support_request(curr_request['id'])
+        create_task(db.remove_support_request(curr_request['id']))
         await bot.send_message(chat_id, f'Член поддержки @{call.from_user.username} скоро окажет вам помощь')
 
         new_keyboard = types.InlineKeyboardMarkup()
         new_keyboard.add(types.InlineKeyboardButton(text=f'Помочь пользователю {username}', url=f't.me/{username}'))
 
         await bot.edit_message_reply_markup(call.from_user.id, call.message.id, reply_markup=new_keyboard)
-    else:
-        await bot.send_message(call.from_user.id, f'Запрос пользователя @{username} больше не актуален')
-    await bot.answer_callback_query(call.id)
+        await bot.answer_callback_query(call.id)
