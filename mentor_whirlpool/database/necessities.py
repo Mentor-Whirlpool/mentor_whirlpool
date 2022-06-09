@@ -135,6 +135,16 @@ class Database:
             values = await self.db.execute('SELECT * FROM STUDENTS '
                                            'WHERE CHAT_ID = %s', (chat_id,))
             return await self.assemble_students_dict(await values.fetchall())
+        if mentor_id is not None:
+            ids = await (await self.db.execute('SELECT STUDENT FROM MENTORS_STUDENTS WHERE '
+                                               'MENTOR = %s', (mentor_id,))).fetchall()
+            if ids is None:
+                return []
+            cursors = await gather(*[self.db.execute('SELECT * FROM STUDENTS '
+                                                     'WHERE ID = %s', (id_f,))
+                                     for (id_f,) in ids])
+            return await self.assemble_students_dict(await gather(*[curs.fetchone()
+                                                                    for curs in cursors]))
         return await self.assemble_students_dict(
             await (await self.db.execute('SELECT * FROM STUDENTS')).fetchall()
         )
