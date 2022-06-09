@@ -313,6 +313,12 @@ class TestDatabaseAccepted(asynctest.TestCase):
                 'description': 'Something',
             },
             {
+                'name': 'Alice',
+                'chat_id': 10001,
+                'subjects': ['TypeScript, Crypto'],
+                'description': 'I\'m not accepted',
+            },
+            {
                 'name': 'Bob',
                 'chat_id': 10002,
                 'subjects': ['TypeScript', 'Crypto'],
@@ -336,9 +342,16 @@ class TestDatabaseAccepted(asynctest.TestCase):
 
         mentors = await self.db.get_mentors()
         for i in range(len(dbwork)):
+            if i == 2:
+                continue
             await self.db.accept_work(mentors[i % len(mentors)]['id'], dbwork[i]['id'])
             mentors[i % len(mentors)]['students'].append(dbwork[i]['student'])
+        for i in dbwork:
+            if i['description'] == 'I\'m not accepted':
+                dbwork.remove(i)
+                break
         self.assertListEqual(await self.db.get_accepted(), dbwork)
+        self.assertListEqual(await self.db.get_course_works(), [])
         for ment in mentors:
             ment_studs = [stud['id'] for stud in await self.db.get_students(mentor_id=ment['id'])]
             ment_studs.sort()
@@ -350,6 +363,8 @@ class TestDatabaseAccepted(asynctest.TestCase):
 
         for work in dbwork:
             await self.db.readmission_work(work['id'])
+        self.assertEqual(len(await self.db.get_course_works()), 3)
+        
 
         # await self.db.modify_course_work()
         await self.db.db.close()
