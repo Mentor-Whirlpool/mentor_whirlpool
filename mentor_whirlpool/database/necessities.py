@@ -437,10 +437,13 @@ class Database:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         line = await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                             'WHERE ID = %s', (work_id,))).fetchone()
-        cw_subj = await (await self.db.execute('SELECT SUBJECT FROM COURSE_WORKS_SUBJECTS '
-                                               'WHERE COURSE_WORK = %s', (work_id,))).fetchall()
         if line is None:
             return
+        to_delete = await (await self.db.execute('SELECT ID FROM COURSE_WORKS '
+                                                 'WHERE STUDENT = %s', (line[1],))).fetchall()
+        to_delete.remove((line[0],))
+        cw_subj = await (await self.db.execute('SELECT SUBJECT FROM COURSE_WORKS_SUBJECTS '
+                                               'WHERE COURSE_WORK = %s', (work_id,))).fetchall()
         await gather(self.db.execute('INSERT INTO ACCEPTED VALUES('
                                      '%s, %s, %s) '
                                      'ON CONFLICT (STUDENT) DO NOTHING',
@@ -454,7 +457,13 @@ class Database:
                      self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1 '
                                      'WHERE ID = %s', (mentor_id,)),
                      self.db.execute('INSERT INTO MENTORS_STUDENTS VALUES('
-                                     '%s, %s)', (mentor_id, line[1],)))
+                                     '%s, %s)', (mentor_id, line[1],)),
+                     *[self.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS '
+                                       'WHERE COURSE_WORK = %s', (id_f,))
+                       for (id_f,) in to_delete],
+                     *[self.db.execute('DELETE FROM COURSE_WORKS '
+                                       'WHERE ID = %s', (id_f,))
+                       for (id_f,) in to_delete])
         await self.db.commit()
 
     async def reject_work(self, mentor_id, work_id):
