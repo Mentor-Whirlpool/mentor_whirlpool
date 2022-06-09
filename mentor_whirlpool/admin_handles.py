@@ -29,10 +29,13 @@ async def course_work(message):
     db = Database()
     course_works = await db.get_course_works()
     messages = []
-    for work in course_works:
-        messages.append(f'@{(await db.get_students(work["student"]))[0]["name"]}\n{work["description"]}')
-    message_course_works = '\n--------\n'.join(messages)
-    await bot.send_message(message.chat.id, message_course_works)
+    if course_works:
+        for work in course_works:
+            messages.append(f'@{(await db.get_students(work["student"]))[0]["name"]}\n{work["description"]}')
+        message_course_works = '\n--------\n'.join(messages)
+        await bot.send_message(message.chat.id, message_course_works)
+    else:
+        await bot.send_message(message.chat.id, 'There aren\'t any course works')
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Менторы')
@@ -77,11 +80,6 @@ async def list_mentors(message):
 async def callback_mentors_info(call):
     db = Database()
     mentor_info = (await db.get_mentors(chat_id=int(call.data[14:])))[0]
-    # mentor_info = {}
-    # for mentor in mentors:
-    #     if mentor['id'] == int(call.data[14:]):
-    #         mentor_info = mentor
-    #         break
     message_subjects = 'Нет выбранных тем'
     message_students = 'Нет студентов'
     if mentor_info['subjects']:
@@ -116,7 +114,8 @@ async def callback_add_student_subject_choice(call):
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
-        *[types.InlineKeyboardButton(subject, callback_data='add_student_with_subject_' + subject + call.data[27:]) for
+        *[types.InlineKeyboardButton(subject,
+                                     callback_data='add_student_with_subject_' + subject + '_' + call.data[27:]) for
           subject in mentor_subjects])
 
     await bot.send_message(call.from_user.id, 'Chose subject to add student', reply_markup=markup)
@@ -128,7 +127,9 @@ async def callback_add_student(call):
     subject, mentor_chat_id = call.data[25:].split('_')
 
     force = types.ForceReply(selective=False)
-    await bot.send_message(call.from_user.id, 'Добавлять студента СТРОГО в формате @student;course_work_name')
+    await bot.send_message(call.from_user.id,
+                           'Добавлять студента СТРОГО в формате <pre>@student;course_work_name</pre>',
+                           parse_mode='html')
     await bot.send_message(call.from_user.id, f'Добавить студента для {mentor_chat_id} {subject}', reply_markup=force)
     await bot.answer_callback_query(call.id)
 
@@ -136,9 +137,8 @@ async def callback_add_student(call):
 @bot.message_handler(func=lambda message: message.reply_to_message and message.reply_to_message.text.startswith(
     'Добавить студента для '))
 async def callback_user_add_subject(message):
-    await bot.send_message(message.chat.id, f'Feature in development')
     db = Database()
-    mentor_chat_id, subject = message.reply_to_message.text[25:].split()
+    mentor_chat_id, subject = message.reply_to_message.text[22:].split()
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
     student_name, course_work_name = message.text.strip()[1:].split(';')
 
@@ -157,9 +157,9 @@ async def callback_user_add_subject(message):
         await db.accept_work(mentor_id, (await db.get_course_works(student=student_id))[0]['id'])
         await bot.send_message(message.chat.id,
                                f'Студен {student_name} добавлен к ментору {(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}')
-        await bot.send_message(mentor_id, f'Студент @{student_name} привязан к Вам админом')
+        await bot.send_message(mentor_chat_id, f'Студент @{student_name} привязан к Вам админом')
         await bot.send_message(student_chat_id,
-                               f'@{(await db.get_mentors(chat_id=mentor_id))[0]["name"]} привязан к Вам админом')
+                               f'@{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]} привязан к Вам админом')
     else:
         await bot.send_message(message.chat.id,
                                f'Студен {student_name} NOT FOUND')
@@ -181,7 +181,7 @@ async def callback_delete_student_info(call):
 async def callback_delete_student(call):
     db = Database()
     mentor_id, work_id, student_id = call.data[12:].split('_')
-    student_info = (await db.get_students(student=student_id))[0]
+    student_info = (await db.get_students(id_field=student_id))[0]
     await bot.send_message(mentor_id, f'Студент @{student_info["name"]} удален')
     await bot.send_message(student_info['chat_id'],
                            f'@{(await db.get_mentors(chat_id=mentor_id))[0]["name"]} больше не Ваш ментор')
@@ -224,7 +224,7 @@ async def callback_delete_subject(call):
     subject, mentor_chat_id = call.data[15:].split('_')
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
 
-    await db.remove_mentor_subject(mentor_id, subject)
+    await db.remove_mentor_subjects(mentor_id, [subject])
     await bot.send_message(mentor_chat_id, f'Тема {subject} успешно удалена админом')
     await bot.send_message(call.from_user.id,
                            f'Тема {subject} успешно удалена у @{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}',
@@ -237,7 +237,8 @@ async def callback_add_subject_info(call):
     mentor_chat_id = call.data[12:]
 
     force = types.ForceReply(selective=False)
-    await bot.send_message(call.from_user.id, 'Добавлять тему/темы СТРОГО в формате тема1;тема2;тема3')
+    await bot.send_message(call.from_user.id, 'Добавлять тему/темы СТРОГО в формате <pre>тема1;тема2;тема3</pre>',
+                           parse_mode='html')
     await bot.send_message(call.from_user.id, f'Добавить тему для {mentor_chat_id}', reply_markup=force)
     await bot.answer_callback_query(call.id)
 
