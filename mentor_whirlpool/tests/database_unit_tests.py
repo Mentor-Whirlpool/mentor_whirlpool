@@ -6,18 +6,18 @@ import string
 
 
 async def clear_database(db):
-        await gather(db.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS'),
-                     db.db.execute('DELETE FROM ACCEPTED_SUBJECTS'),
-                     db.db.execute('DELETE FROM MENTORS_SUBJECTS'),
-                     db.db.execute('DELETE FROM MENTORS_STUDENTS'),
-                     db.db.execute('DELETE FROM SUPPORT_REQUESTS'),
-                     db.db.execute('DELETE FROM ACCEPTED'),
-                     db.db.execute('DELETE FROM COURSE_WORKS'),
-                     db.db.execute('DELETE FROM ADMINS'),
-                     db.db.execute('DELETE FROM MENTORS'),
-                     db.db.execute('DELETE FROM STUDENTS'),
-                     db.db.execute('DELETE FROM SUBJECTS'),
-                     db.db.execute('DELETE FROM SUPPORTS'))
+    await gather(db.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS'),
+                 db.db.execute('DELETE FROM ACCEPTED_SUBJECTS'),
+                 db.db.execute('DELETE FROM MENTORS_SUBJECTS'),
+                 db.db.execute('DELETE FROM MENTORS_STUDENTS'),
+                 db.db.execute('DELETE FROM SUPPORT_REQUESTS'),
+                 db.db.execute('DELETE FROM ACCEPTED'),
+                 db.db.execute('DELETE FROM COURSE_WORKS'),
+                 db.db.execute('DELETE FROM ADMINS'),
+                 db.db.execute('DELETE FROM MENTORS'),
+                 db.db.execute('DELETE FROM STUDENTS'),
+                 db.db.execute('DELETE FROM SUBJECTS'),
+                 db.db.execute('DELETE FROM SUPPORTS'))
 
 # fine to test altogether, because different tables are tested
 class TestDatabaseSimple(asynctest.TestCase):
@@ -331,15 +331,19 @@ class TestDatabaseAccepted(asynctest.TestCase):
         await self.db.add_mentor({
             'name': 'Yoshi',
             'chat_id': 10003,
-            'subjects': None
+            'subjects': []
         })
 
-        mentors_id = [mentor['id'] for mentor in await self.db.get_mentors()]
-        for i in range(len(dbwork)):
-            await self.db.accept_work(mentors_id[i % len(mentors_id)], dbwork[i]['id'])
         mentors = await self.db.get_mentors()
+        for i in range(len(dbwork)):
+            await self.db.accept_work(mentors[i % len(mentors)]['id'], dbwork[i]['id'])
+            mentors[i % len(mentors)]['students'].append(dbwork[i]['student'])
         self.assertListEqual(await self.db.get_accepted(), dbwork)
-
+        for ment in mentors:
+            ment_studs = [stud['id'] for stud in await self.db.get_students(mentor_id=ment['id'])]
+            ment_studs.sort()
+            ment['students'].sort()
+            self.assertListEqual(ment_studs, ment['students'])
         for work in dbwork:
             # self.assertEqual((await self.db.get_accepted(work['subjects']))[0], work)
             self.assertEqual((await self.db.get_accepted(student=work['student']))[0], work)
