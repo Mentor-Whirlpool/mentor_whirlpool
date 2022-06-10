@@ -49,11 +49,21 @@ async def add_request(message):
 
 @bot.message_handler(state=StudentStates.add_own_subject_flag)
 async def add_own_subject(message):
-    async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-        data['subject'] = message.text
+    db = Database()
+    subjects = await db.get_subjects()
 
-    await gather(bot.set_state(message.from_user.id, StudentStates.add_work_flag, message.chat.id),
-                 bot.send_message(message.chat.id, "Введите название работы:"))
+    if message.text in subjects:
+        await gather(bot.delete_state(message.from_user.id, message.chat.id),
+                     bot.send_message(message.chat.id, "Предмет с таким названием уже существует!"))
+    else:
+        async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+            data['subject'] = message.text
+
+        db = Database()
+        subjects = await db.get_subjects()
+
+        await gather(bot.set_state(message.from_user.id, StudentStates.add_work_flag, message.chat.id),
+                     bot.send_message(message.chat.id, "Введите название работы:"))
 
 
 @bot.message_handler(state=StudentStates.add_work_flag)
@@ -66,10 +76,16 @@ async def save_request(message):
                         'description': entered_topic}
 
     db = Database()
-    await db.add_course_work(student_dict)
+    id = await db.get_students(chat_id=message.chat.id)
+    student_request = await db.get_course_works(student=id[0]['id'])
+    course_work_names = [work['description'] for work in student_request]
 
-    await gather(bot.delete_state(message.from_user.id, message.chat.id),
-                 bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора."))
+    if entered_topic in course_work_names:
+        await gather(bot.delete_state(message.from_user.id, message.chat.id),
+                     bot.send_message(message.chat.id, "Работа с таким именем уже добавлена!"))
+    else:
+        await gather(db.add_course_work(student_dict), bot.delete_state(message.from_user.id, message.chat.id),
+                     bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора."))
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои запросы')
