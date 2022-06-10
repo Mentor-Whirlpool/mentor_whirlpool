@@ -1038,3 +1038,24 @@ class Database:
         if res is None:
             res = await (await self.db.execute('SELECT * FROM SUPPORT_REQUESTS')).fetchall()
         return await self.assemble_support_requests_dict(res)
+
+    async def check_is_support(self, chat_id):
+        """
+        Checks if specified chat_id is present in database as a support
+
+        Parameters
+        ----------
+        chat_id : int
+            a chat id to check
+
+        Returns
+        -------
+        boolean
+            True if exists, false otherwise
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        return (await (await self.db.execute('SELECT EXISTS('
+                                             'SELECT * FROM SUPPORTS '
+                                             'WHERE CHAT_ID = %s)',
+                                             (chat_id,))).fetchone())[0]
