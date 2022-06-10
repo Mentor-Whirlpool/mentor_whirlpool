@@ -6,6 +6,8 @@ class StudentTables():
     async def assemble_students_dict(self, cursor):
         list = []
         for i in cursor:
+            if i is None:
+                continue
             line = {
                 'id': i[0],
                 'name': i[1],

@@ -33,6 +33,8 @@ class MentorsTables:
     async def assemble_mentors_dict(self, cursor):
         list = []
         for i in cursor:
+            if i is None:
+                continue
             students = await self.get_students(mentor_id=i[0])
             line = {
                 'id': i[0],

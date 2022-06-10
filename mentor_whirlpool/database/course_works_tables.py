@@ -46,6 +46,8 @@ class CourseWorksTables:
     async def assemble_courses_dict(self, cursor):
         list = []
         for i in cursor:
+            if i is None:
+                continue
             line = {
                 'id': i[0],
                 'student': i[1],

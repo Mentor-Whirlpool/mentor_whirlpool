@@ -47,6 +47,8 @@ class SupportsTables:
     async def assemble_supports_dict(self, res):
         list = []
         for i in res:
+            if i is None:
+                continue
             line = {
                 'id': i[0],
                 'chat_id': i[1],
@@ -124,6 +126,8 @@ class SupportsTables:
     async def assemble_support_requests_dict(self, cursor):
         list = []
         for i in cursor:
+            if i is None:
+                continue
             support = None
             if i[4] is not None:
                 support = await self.get_supports(i[4])
