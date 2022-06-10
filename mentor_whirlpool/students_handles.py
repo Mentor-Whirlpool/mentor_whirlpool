@@ -37,6 +37,8 @@ async def generic_start(message):
 @bot.message_handler(func=lambda msg: msg.text == 'Добавить запрос')
 async def add_request(message):
     db = Database()
+    if db.check_is_mentor(message.from_user.id):
+        return
 
     markup = types.InlineKeyboardMarkup(row_width=1)
     subjects_ = await db.get_subjects()
@@ -91,21 +93,25 @@ async def save_request(message):
 @bot.message_handler(func=lambda msg: msg.text == 'Мои запросы')
 async def my_requests(message):
     db = Database()
+    if db.check_is_mentor(message.from_user.id):
+        return
     id = await db.get_students(chat_id=message.chat.id)
 
     if not id:
         await bot.send_message(message.chat.id, f"Пока у вас нет запросов. Скорее добавьте первый!")
         return
     student_request = await db.get_course_works(student=id[0]['id'])
-    for course_work in student_request:
-        await bot.send_message(message.chat.id,
-                               f"*Работа №{course_work['id']}*\nПредмет: {course_work['subjects'][0]}\n"
-                               f"Тема работы: {course_work['description']}", parse_mode="Markdown")
+    await gather(*[bot.send_message(message.chat.id,
+                                    f"*Работа №{course_work['id']}*\nПредмет: {course_work['subjects'][0]}\n"
+                                    f"Тема работы: {course_work['description']}", parse_mode="Markdown")
+                   for course_work in student_request])
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Удалить запрос')
 async def remove_request(message):
     db = Database()
+    if db.check_is_mentor(message.from_user.id):
+        return
     id = await db.get_students(chat_id=message.chat.id)
 
     student_request = await db.get_course_works(student=id[0]['id'])
@@ -123,6 +129,8 @@ async def remove_request(message):
 @bot.message_handler(func=lambda msg: msg.text == 'Хочу стать ментором')
 async def mentor_resume(message):
     db = Database()
+    if db.check_is_mentor(message.from_user.id):
+        return
     admins = await db.get_admins()
 
     admin_chat_id = random.choice(admins)['chat_id']
