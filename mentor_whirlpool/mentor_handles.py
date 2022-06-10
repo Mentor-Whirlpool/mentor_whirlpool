@@ -1,7 +1,7 @@
 from telegram import bot
 from telebot import types
 from confirm import confirm
-from database.necessities import Database
+from database import Database
 from asyncio import gather, create_task
 
 
