@@ -126,8 +126,11 @@ class SupportsTables:
     async def assemble_support_requests_dict(self, cursor):
         list = []
         for i in cursor:
+<<<<<<< HEAD
             if i is None:
                 continue
+=======
+>>>>>>> 7a8668a (1. Added async actions to asyncio.gather();)
             support = None
             if i[4] is not None:
                 support = await self.get_supports(i[4])

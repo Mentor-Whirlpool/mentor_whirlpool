@@ -3,8 +3,9 @@ from telebot import types
 from telebot import asyncio_filters
 from telebot.asyncio_handler_backends import State, StatesGroup
 from database import Database
-from asyncio import create_task
+from asyncio import gather
 from confirm import confirm
+import random
 
 
 class StudentStates(StatesGroup):
@@ -42,7 +43,7 @@ async def add_request(message):
     for sub in subjects_:
         markup.add(types.InlineKeyboardButton(sub, callback_data=f"add_request_{sub}"))
     markup.add(types.InlineKeyboardButton("Добавить свою тему", callback_data=f"own_request"))
-    
+
     await bot.send_message(message.chat.id, f"Добавить запрос:", reply_markup=markup)
 
 
@@ -51,8 +52,8 @@ async def add_own_subject(message):
     async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
         data['subject'] = message.text
 
-    await bot.set_state(message.from_user.id, StudentStates.add_work_flag, message.chat.id)
-    await bot.send_message(message.chat.id, "Введите название работы:")
+    await gather(bot.set_state(message.from_user.id, StudentStates.add_work_flag, message.chat.id),
+                 bot.send_message(message.chat.id, "Введите название работы:"))
 
 
 @bot.message_handler(state=StudentStates.add_work_flag)
@@ -67,30 +68,23 @@ async def save_request(message):
     db = Database()
     await db.add_course_work(student_dict)
 
-    await bot.delete_state(message.from_user.id, message.chat.id)
-    await bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора.")
+    await gather(bot.delete_state(message.from_user.id, message.chat.id),
+                 bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора."))
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои запросы')
 async def my_requests(message):
     db = Database()
     id = await db.get_students(chat_id=message.chat.id)
-    print(message.chat.id)
+
     if not id:
         await bot.send_message(message.chat.id, f"Пока у вас нет запросов. Скорее добавьте первый!")
-        await add_request(message)
-    else:
-        print(id)
-        student_request = await db.get_course_works(student=id[0]['id'])
-        if not student_request:
-            await bot.send_message(message.chat.id, f"Пока у вас нет запросов.")
-            await add_request(message)
-        else:
-            for course_work in student_request:
-                await bot.send_message(message.chat.id,
-                                       f"*Работа №{course_work['id']}*\nПредмет: {course_work['subjects'][0]}\n"
-                                       f"Тема работы: {course_work['description']}",
-                                       parse_mode='Markdown')
+        return
+    student_request = await db.get_course_works(student=id[0]['id'])
+    for course_work in student_request:
+        await bot.send_message(message.chat.id,
+                               f"*Работа №{course_work['id']}*\nПредмет: {course_work['subjects'][0]}\n"
+                               f"Тема работы: {course_work['description']}", parse_mode="Markdown")
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Удалить запрос')
@@ -115,10 +109,9 @@ async def mentor_resume(message):
     db = Database()
     admins = await db.get_admins()
 
-    for admin in admins:
-        admin_chat_id = admin['chat_id']
-        await bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором.")
-    await bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!")
+    admin_chat_id = random.choice(admins)['chat_id']
+    await gather(bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором."),
+                 bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!"))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_request_"))
@@ -128,9 +121,6 @@ async def select_subject_callback(call):
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
         data['subject'] = call.data[12:]
-        print(data)
-
-    print(call.message.chat.id)
     await bot.answer_callback_query(call.id)
 
 
@@ -138,8 +128,8 @@ async def select_subject_callback(call):
 async def add_own_subject_callback(call):
     await bot.set_state(call.from_user.id, StudentStates.add_own_subject_flag, call.message.chat.id)
 
-    await bot.answer_callback_query(call.id)
-    await bot.send_message(call.from_user.id, "Введите название предмета:")
+    await gather(bot.answer_callback_query(call.id),
+                 bot.send_message(call.from_user.id, "Введите название предмета:"))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_request_"))
@@ -147,9 +137,8 @@ async def delete_topic_callback(call):
     id_ = call.data[15:]
     db = Database()
 
-    await db.remove_course_work(id_)
-    await bot.answer_callback_query(call.id)
-    await bot.send_message(call.from_user.id, "Работа успешно удалена!")
+    await gather(db.remove_course_work(id_), bot.answer_callback_query(call.id),
+                 bot.send_message(call.from_user.id, "Работа успешно удалена!"))
 
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))

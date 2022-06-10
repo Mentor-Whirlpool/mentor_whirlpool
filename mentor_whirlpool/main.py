@@ -12,6 +12,7 @@ import admin_handles
 import support_handles
 import support_request_handler
 
+
 async def main():
     db = Database()
     await db.initdb()
