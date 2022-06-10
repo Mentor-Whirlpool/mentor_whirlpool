@@ -37,7 +37,7 @@ async def generic_start(message):
 @bot.message_handler(func=lambda msg: msg.text == 'Добавить запрос')
 async def add_request(message):
     db = Database()
-    if db.check_is_mentor(message.from_user.id):
+    if await db.check_is_mentor(message.from_user.id):
         return
 
     markup = types.InlineKeyboardMarkup(row_width=1)
@@ -93,7 +93,7 @@ async def save_request(message):
 @bot.message_handler(func=lambda msg: msg.text == 'Мои запросы')
 async def my_requests(message):
     db = Database()
-    if db.check_is_mentor(message.from_user.id):
+    if await db.check_is_mentor(message.from_user.id):
         return
     id = await db.get_students(chat_id=message.chat.id)
 
@@ -110,7 +110,7 @@ async def my_requests(message):
 @bot.message_handler(func=lambda msg: msg.text == 'Удалить запрос')
 async def remove_request(message):
     db = Database()
-    if db.check_is_mentor(message.from_user.id):
+    if await db.check_is_mentor(message.from_user.id):
         return
     id = await db.get_students(chat_id=message.chat.id)
 
@@ -129,7 +129,7 @@ async def remove_request(message):
 @bot.message_handler(func=lambda msg: msg.text == 'Хочу стать ментором')
 async def mentor_resume(message):
     db = Database()
-    if db.check_is_mentor(message.from_user.id):
+    if await db.check_is_mentor(message.from_user.id):
         return
     admins = await db.get_admins()
 
