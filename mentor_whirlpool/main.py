@@ -10,6 +10,7 @@ import generic_handles
 import mentor_handles
 import admin_handles
 import support_handles
+import support_request_handler
 
 
 async def main():
