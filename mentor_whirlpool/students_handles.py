@@ -30,7 +30,7 @@ async def generic_start(message):
     iterable
         Iterable with all handles texts
     """
-    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Хочу стать ментором']
+    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Хочу стать ментором', 'Поддержка']
     return commands
 
 
