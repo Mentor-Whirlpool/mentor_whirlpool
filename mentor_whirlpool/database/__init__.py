@@ -1,4 +1,5 @@
 import psycopg
+from os import environ as env
 from asyncio import gather
 from database.students_tables import StudentTables
 from database.course_works_tables import CourseWorksTables
@@ -14,10 +15,10 @@ class Database(StudentTables, CourseWorksTables, AcceptedTables, MentorsTables,
     def __init__(self):
         self.db = None
         self.conn_opts = ('dbname=mentor_whirlpool '
-                          'user=postgres '
-                          'host=localhost '
-                          'port=5432 '
-                          'password=s3cret')
+                          f'user={env["POSTGRE_USER"]} '
+                          f'host={env["POSTGRE_ADDRESS"]} '
+                          f'port={env["POSTGRE_PORT"]} '
+                          f'password={env["POSTGRE_PASSWD"]}')
 
     async def initdb(self):
         """
