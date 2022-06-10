@@ -30,7 +30,7 @@ async def generic_start(message):
     iterable
         Iterable with all handles texts
     """
-    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Хочу стать ментором', 'Поддержка']
+    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Запросить доп. ментора', 'Хочу стать ментором', 'Поддержка']
     return commands
 
 
@@ -40,13 +40,34 @@ async def add_request(message):
     if await db.check_is_mentor(message.from_user.id):
         return
 
+    id = await db.get_students(chat_id=message.chat.id)
+    if id and await db.get_accepted(student=id[0]['id']):
+        await bot.send_message(message.from_user.id, "Вас уже обслуживает ментор")
+        return
     markup = types.InlineKeyboardMarkup(row_width=1)
     subjects_ = await db.get_subjects()
     for sub in subjects_:
         markup.add(types.InlineKeyboardButton(sub, callback_data=f"add_request_{sub}"))
-    markup.add(types.InlineKeyboardButton("Добавить свою тему", callback_data=f"own_request"))
+    markup.add(types.InlineKeyboardButton("Добавить свою тему", callback_data="own_request"))
 
-    await bot.send_message(message.chat.id, f"Добавить запрос:", reply_markup=markup)
+    await bot.send_message(message.chat.id, "Добавить запрос:", reply_markup=markup)
+
+
+@bot.message_handler(func=lambda msg: msg.text == 'Запросить доп. ментора')
+async def add_request(message):
+    db = Database()
+    if await db.check_is_mentor(message.from_user.id):
+        return
+
+    id = await db.get_students(chat_id=message.chat.id)
+    accepted = None
+    if id:
+        accepted = await db.get_accepted(student=id[0]['id'])
+    if not accepted:
+        await bot.send_message(message.from_user.id, 'Вас ещё не курирует ментор')
+        return
+    await gather(db.readmission_work(accepted[0]['id']),
+                 bot.send_message(message.from_user.id, 'Вы успешно запросили доп. ментора'))
 
 
 @bot.message_handler(state=StudentStates.add_own_subject_flag)
@@ -100,7 +121,10 @@ async def my_requests(message):
     id = await db.get_students(chat_id=message.chat.id)
 
     if not id:
-        await bot.send_message(message.chat.id, f"Пока у вас нет запросов. Скорее добавьте первый!")
+        await bot.send_message(message.from_user.id, "Пока у вас нет запросов. Скорее добавьте первый!")
+        return
+    if await db.get_accepted(student=id[0]['id']):
+        await bot.send_message(message.from_user.id, "Вас уже обслуживает ментор")
         return
     student_request = await db.get_course_works(student=id[0]['id'])
     await gather(*[bot.send_message(message.chat.id,
@@ -118,6 +142,10 @@ async def remove_request(message):
 
     if not id:
         await bot.send_message(message.from_user.id, "Пока у вас нет запросов. Скорее добавьте первый!")
+        return
+    if await db.get_accepted(student=id[0]['id']):
+        await gather(db.remove_student(id[0]['id']),
+                     bot.send_message(message.from_user.id, 'Вас больше не обслуживает ментор'))
         return
     student_request = await db.get_course_works(student=id[0]['id'])
 
