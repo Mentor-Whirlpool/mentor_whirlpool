@@ -1,17 +1,17 @@
 from telegram import bot
 from telebot import types
+from telebot import asyncio_filters
+from telebot.asyncio_handler_backends import State, StatesGroup
 from database import Database
 from asyncio import create_task
 from confirm import confirm
 
-import pandas as pd
-import test_database
 
-add_own_subject_flag = False
-add_work_flag = False
-
-subject = ""
-topic = ""
+class StudentStates(StatesGroup):
+    add_work_flag = State()
+    add_own_subject_flag = State()
+    subject = State()
+    topic = State()
 
 
 async def generic_start(message):
@@ -42,35 +42,32 @@ async def add_request(message):
     for sub in subjects_:
         markup.add(types.InlineKeyboardButton(sub, callback_data=f"add_request_{sub}"))
     markup.add(types.InlineKeyboardButton("Добавить свою тему", callback_data=f"own_request"))
+    
     await bot.send_message(message.chat.id, f"Добавить запрос:", reply_markup=markup)
 
 
-@bot.message_handler(func=lambda m: add_own_subject_flag is True)
+@bot.message_handler(state=StudentStates.add_own_subject_flag)
 async def add_own_subject(message):
-    global add_own_subject_flag
-    global add_work_flag
-    global subject
+    async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        data['subject'] = message.text
 
-    subject = message.text
-    add_own_subject_flag = False
-    add_work_flag = True
-
+    await bot.set_state(message.from_user.id, StudentStates.add_work_flag, message.chat.id)
     await bot.send_message(message.chat.id, "Введите название работы:")
 
 
-@bot.message_handler(func=lambda m: add_work_flag is True)
+@bot.message_handler(state=StudentStates.add_work_flag)
 async def save_request(message):
-    global subject
-    global add_work_flag
-
     entered_topic = message.text
-    student_dict = {'name': message.from_user.username, 'chat_id': message.chat.id, 'subjects': [subject],
-                    'description': entered_topic}
+    student_dict = dict()
+
+    async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
+        student_dict = {'name': message.from_user.username, 'chat_id': message.chat.id, 'subjects': [data['subject']],
+                        'description': entered_topic}
 
     db = Database()
     await db.add_course_work(student_dict)
 
-    add_work_flag = False
+    await bot.delete_state(message.from_user.id, message.chat.id)
     await bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора.")
 
 
@@ -78,11 +75,12 @@ async def save_request(message):
 async def my_requests(message):
     db = Database()
     id = await db.get_students(chat_id=message.chat.id)
-
+    print(message.chat.id)
     if not id:
         await bot.send_message(message.chat.id, f"Пока у вас нет запросов. Скорее добавьте первый!")
         await add_request(message)
     else:
+        print(id)
         student_request = await db.get_course_works(student=id[0]['id'])
         if not student_request:
             await bot.send_message(message.chat.id, f"Пока у вас нет запросов.")
@@ -114,42 +112,34 @@ async def remove_request(message):
 
 @bot.message_handler(func=lambda msg: msg.text == 'Хочу стать ментором')
 async def mentor_resume(message):
-    """
-    Send a notice to random admin with contact details of requester
-    Send a requester contact details of an admin
-    Should request a confirmation
-
-    Parameters
-    ----------
-    message : telebot.types.Message
-        A pyTelegramBotAPI Message type class
-    """
     db = Database()
     admins = await db.get_admins()
 
     for admin in admins:
         admin_chat_id = admin['chat_id']
         await bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором.")
+    await bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!")
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_request_"))
 async def select_subject_callback(call):
     await bot.send_message(call.from_user.id, "Введите название работы:")
-    global add_work_flag
-    global subject
 
-    add_work_flag = True
-    subject = call.data[12:]
+    await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
+    async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
+        data['subject'] = call.data[12:]
+        print(data)
+
+    print(call.message.chat.id)
     await bot.answer_callback_query(call.id)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("own_request"))
 async def add_own_subject_callback(call):
-    global add_own_subject_flag
+    await bot.set_state(call.from_user.id, StudentStates.add_own_subject_flag, call.message.chat.id)
 
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, "Введите название предмета:")
-    add_own_subject_flag = True
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_request_"))
@@ -160,3 +150,7 @@ async def delete_topic_callback(call):
     await db.remove_course_work(id_)
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, "Работа успешно удалена!")
+
+
+bot.add_custom_filter(asyncio_filters.StateFilter(bot))
+bot.add_custom_filter(asyncio_filters.IsDigitFilter())
