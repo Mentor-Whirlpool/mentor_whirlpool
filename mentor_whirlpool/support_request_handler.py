@@ -1,5 +1,5 @@
 from telegram import bot
-from asyncio import create_task
+from asyncio import gather
 
 from database import Database
 
@@ -16,15 +16,18 @@ async def request_support(message):
         A pyTelegramBotAPI Message type class
     """
     db = Database()
-    if await db.get_students(chat_id=message.chat.id) or await db.get_mentors(chat_id=message.chat.id):
-        if not await db.get_support_requests(chat_id=message.chat.id):
-            create_task(db.add_support_request({
-                'chat_id': message.chat.id,
-                'name': message.from_user.username,
-                'issue': None,
-            }))
-            for chat_id in [rec['chat_id'] for rec in await db.get_supports()]:
-                await bot.send_message(chat_id, 'Пользователю нужна помощь')
-            await bot.send_message(message.chat.id, 'Ждите ответ поддержки')
-        else:
-            await bot.send_message(message.chat.id, 'Вы уже отправили запрос. Ждите ответ поддержки')
+    is_ellegible = not any(await gather(db.check_is_admin(message.from_user.id),
+                                        db.check_is_support(message.from_user.id)))
+    if not is_ellegible:
+        return
+    if not await db.get_support_requests(chat_id=message.chat.id):
+        await gather(db.add_support_request({
+            'chat_id': message.chat.id,
+            'name': message.from_user.username,
+            'issue': None,
+        }),
+            *[bot.send_message(chat_id, 'Пользователю нужна помощь')
+              for chat_id in [rec['chat_id'] for rec in await db.get_supports()]],
+            bot.send_message(message.chat.id, 'Ждите ответ поддержки'))
+    else:
+        await bot.send_message(message.chat.id, 'Вы уже отправили запрос. Ждите ответ поддержки')
