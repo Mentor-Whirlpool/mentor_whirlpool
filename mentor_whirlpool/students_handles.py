@@ -30,7 +30,8 @@ async def generic_start(message):
     iterable
         Iterable with all handles texts
     """
-    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Запросить доп. ментора', 'Хочу стать ментором', 'Поддержка']
+    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Запросить доп. ментора', 'Хочу стать ментором',
+                'Поддержка']
     return commands
 
 
@@ -41,6 +42,7 @@ async def add_request(message):
         return
 
     id = await db.get_students(chat_id=message.chat.id)
+
     if id and await db.get_accepted(student=id[0]['id']):
         await bot.send_message(message.from_user.id, "Вас уже обслуживает ментор")
         return
@@ -123,8 +125,12 @@ async def my_requests(message):
     if not id:
         await bot.send_message(message.from_user.id, "Пока у вас нет запросов. Скорее добавьте первый!")
         return
+
     if await db.get_accepted(student=id[0]['id']):
-        await bot.send_message(message.from_user.id, "Вас уже обслуживает ментор")
+        mentor = await db.get_mentors(student=id[0]['id'])
+        await bot.send_message(message.from_user.id,
+                               f"Текущая принятая курсовая работа: *{id[0]['course_works'][0]['description']}*\n"
+                               f"Твой ментор: *@{mentor[0]['name']}*", parse_mode="Markdown")
         return
     student_request = await db.get_course_works(student=id[0]['id'])
     await gather(*[bot.send_message(message.chat.id,
@@ -143,20 +149,25 @@ async def remove_request(message):
     if not id:
         await bot.send_message(message.from_user.id, "Пока у вас нет запросов. Скорее добавьте первый!")
         return
-    if await db.get_accepted(student=id[0]['id']):
-        await gather(db.remove_student(id[0]['id']),
-                     bot.send_message(message.from_user.id, 'Вас больше не обслуживает ментор'))
-        return
-    student_request = await db.get_course_works(student=id[0]['id'])
 
     markup = types.InlineKeyboardMarkup(row_width=1)
-    for course_work in student_request:
-        markup.add(
-            types.InlineKeyboardButton(course_work['description'],
-                                       callback_data=f"delete_request_{course_work['id']}"))
+    if await db.get_accepted(student=id[0]['id']):
+        markup.add(types.InlineKeyboardButton(f"Удалить курсовую \"{id[0]['course_works'][0]['description']}\"",
+                                              callback_data=f"delete_finale_{id[0]['id']}"))
 
-    await bot.send_message(message.chat.id, "Выберите работу, которую хотите удалить из списка запросов: ",
-                           reply_markup=markup)
+        await bot.send_message(message.from_user.id, 'Внимание! Вы собираетесь удалить свою курсовую работу!',
+                               reply_markup=markup)
+        return
+    else:
+        student_request = await db.get_course_works(student=id[0]['id'])
+
+        for course_work in student_request:
+            markup.add(
+                types.InlineKeyboardButton(course_work['description'],
+                                           callback_data=f"delete_request_{course_work['id']}"))
+
+        await bot.send_message(message.chat.id, "Выберите работу, которую хотите удалить из списка запросов: ",
+                               reply_markup=markup)
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Хочу стать ментором')
@@ -192,11 +203,31 @@ async def add_own_subject_callback(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_request_"))
 async def delete_topic_callback(call):
     id_ = call.data[15:]
+    print(id_)
     db = Database()
 
     await gather(db.remove_course_work(id_), bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id, "Работа успешно удалена!"))
 
 
-bot.add_custom_filter(asyncio_filters.StateFilter(bot))
-bot.add_custom_filter(asyncio_filters.IsDigitFilter())
+@bot.callback_query_handler(func=lambda call: call.data.startswith("delete_finale"))
+async def delete_finale(call):
+    print("here")
+    id_ = call.data[14:]
+    print(id_)
+
+    db = Database()
+    student = await db.get_students(id_)
+    print(student)
+    mentor = await db.get_mentors(student=id_)
+    print(mentor)
+
+    await gather(db.remove_student(id_), bot.answer_callback_query(call.id),
+                 bot.send_message(call.from_user.id,
+                                  "Ваша курсовая работа успешно удалена. Но вы всегда можете начать новую!"),
+                 bot.send_message(mentor[0]['chat_id'],
+                                  f"Студент @{student[0]['name']} удалил принятую вами "
+                                  f"курсовую работу \"{student[0]['course_works'][0]['description']}\""))
+
+    bot.add_custom_filter(asyncio_filters.StateFilter(bot))
+    bot.add_custom_filter(asyncio_filters.IsDigitFilter())

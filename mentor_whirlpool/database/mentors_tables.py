@@ -47,9 +47,11 @@ class MentorsTables:
             list.append(line)
         return list
 
-    async def get_mentors(self, id=None, chat_id=None):
+    async def get_mentors(self, id=None, chat_id=None, student=None):
         """
         Gets all lines from MENTORS table
+        If student argument is supplied, search for a mentor for a specific
+        student
 
         Parameters
         ----------
@@ -70,15 +72,23 @@ class MentorsTables:
             mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
                                                     'WHERE ID = %s',
                                                     (id,))).fetchone()]
-            if mentors is None:
-                return None  # raise
         if chat_id is not None:
             mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
                                                     'WHERE CHAT_ID = %s',
                                                     (chat_id,))).fetchone()]
-            if mentors is None:
-                return None  # raise
-        if id is None and chat_id is None:
+        if student is not None:
+            mentor = await (await self.db.execute('SELECT MENTOR FROM MENTORS_STUDENTS '
+                                                  'WHERE STUDENT= %s',
+                                                  (student,))).fetchone()
+            if mentor is None:
+                return []
+            # parameter is just mentor, as it is already a tuple
+            # beneficial to do so, because fetchone will return None if
+            # mentor has not been found
+            mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
+                                                    'WHERE ID = %s',
+                                                    mentor)).fetchone()]
+        if id is None and chat_id is None and student is None:
             mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
         return await self.assemble_mentors_dict(mentors)
 
