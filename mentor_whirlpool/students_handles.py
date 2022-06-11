@@ -229,5 +229,5 @@ async def delete_finale(call):
                                   f"Студент @{student[0]['name']} удалил принятую вами "
                                   f"курсовую работу \"{student[0]['course_works'][0]['description']}\""))
 
-    bot.add_custom_filter(asyncio_filters.StateFilter(bot))
-    bot.add_custom_filter(asyncio_filters.IsDigitFilter())
+bot.add_custom_filter(asyncio_filters.StateFilter(bot))
+bot.add_custom_filter(asyncio_filters.IsDigitFilter())
