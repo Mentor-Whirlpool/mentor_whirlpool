@@ -54,6 +54,12 @@ async def works(message):
         await bot.send_message(message.chat.id, '<b>Сначала добавьте темы</b>', parse_mode='html')
         return
     course_works = await db.get_course_works(subjects=my_subjects_)
+    course_works_to_remove = [student['course_work'] for student in
+                              await db.get_mentors(chat_id=message.from_user.id)['students']]
+
+    for course_work in course_works_to_remove:
+        course_works.remove(course_work)
+
     markup = types.InlineKeyboardMarkup()
 
     for work in course_works:
