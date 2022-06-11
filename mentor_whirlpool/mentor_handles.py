@@ -4,7 +4,6 @@ from confirm import confirm
 from database import Database
 from asyncio import gather, create_task
 
-
 # from gettext import translation
 
 from confirm import confirm
@@ -70,14 +69,17 @@ async def works(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('work_'))
 async def callback_query_work(call):
     db = Database()
-    my_id = (await db.get_mentors(chat_id=call.from_user.id))[0]['id']
+    mentor_info = (await db.get_mentors(chat_id=call.from_user.id))[0]
     course_work_info = (await db.get_course_works(int(call.data[5:])))[0]
 
-    await gather(db.accept_work(my_id, call.data[5:]),
+    await gather(db.accept_work(mentor_info['id'], call.data[5:]),
                  bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id,
                                   f'Вы взялись за <b>{course_work_info["description"]}</b>\n'
                                   f'Напишите @{(await db.get_students(id_field=course_work_info["student"]))[0]["name"]}',
+                                  parse_mode='html'),
+                 bot.send_message((await db.get_students(id_field=course_work_info["student"]))[0]["chat_id"],
+                                  f'Ментор @{mentor_info["name"]} принял Ваш запрос <b>{course_work_info["description"]}</b>',
                                   parse_mode='html'))
 
 
