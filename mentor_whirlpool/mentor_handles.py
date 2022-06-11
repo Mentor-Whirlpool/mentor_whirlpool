@@ -54,7 +54,7 @@ async def works(message):
         await bot.send_message(message.chat.id, '<b>Сначала добавьте темы</b>', parse_mode='html')
         return
     course_works = await db.get_course_works(subjects=my_subjects_)
-    students = await db.get_mentors(chat_id=message.from_user.id)['students']
+    students = (await db.get_mentors(chat_id=message.from_user.id))['students']
 
     for stud in students:
         for work in stud['course_works']:
