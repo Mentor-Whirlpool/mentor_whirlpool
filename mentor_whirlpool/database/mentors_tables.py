@@ -59,6 +59,8 @@ class MentorsTables:
             database id of the mentor
         chat_id : int
             telegram chat_id of required mentor
+        student : int
+            database id of student to search mentor by
 
         Returns
         ------
@@ -79,7 +81,7 @@ class MentorsTables:
         if student is not None:
             mentor = await (await self.db.execute('SELECT MENTOR FROM MENTORS_STUDENTS '
                                                   'WHERE STUDENT= %s',
-                                                  (id,))).fetchone()
+                                                  (student,))).fetchone()
             if mentor is None:
                 return []
             # parameter is just mentor, as it is already a tuple
