@@ -6,9 +6,11 @@ from database import Database
 
 # here will be handles importing
 import common
-import generic_handles
+import students_handles
 import mentor_handles
 import admin_handles
+import support_handles
+import support_request_handler
 
 
 async def main():
