@@ -69,7 +69,7 @@ async def works(message):
         markup.add(
             types.InlineKeyboardButton(
                 f'@{(await db.get_students(work["student"]))[0]["name"]}\n{work["description"]}',
-                callback_data='work_' + str(work['id'])))
+                callback_data='confirm_work_' + str(work['id'])))
 
     await bot.send_message(message.chat.id, '<b>Доступные курсовые работы</b>',
                            reply_markup=markup, parse_mode='html')
