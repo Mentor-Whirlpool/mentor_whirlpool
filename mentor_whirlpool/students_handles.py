@@ -177,8 +177,12 @@ async def mentor_resume(message):
         return
     admins = await db.get_admins()
 
+    markup = types.InlineKeyboardMarkup()
+    markup.add(types.InlineKeyboardButton('Одобрить', callback_data='add_mentor_via_admin_' + str(message.from_user.id)))
+
     admin_chat_id = random.choice(admins)['chat_id']
-    await gather(bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором."),
+    await gather(bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором.",
+                                  reply_markup=markup),
                  bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!"))
 
 

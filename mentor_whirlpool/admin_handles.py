@@ -24,6 +24,16 @@ async def admin_start(message):
     return ['Менторы', 'Запросы (админ)']
 
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('add_mentor_via_admin_'))
+async def callback_add_mentor(call):
+    db = Database()
+    new_mentor_info = await bot.get_chat(call.data[21:])
+    await gather(db.add_mentor({'name': new_mentor_info.username, 'chat_id': call.data[21:], 'subjects': None}),
+                 bot.send_message(call.data[21:], 'Теперь Вы ментор!'),
+                 bot.send_message(call.from_user.id, f'@{new_mentor_info.username} стал ментором'),
+                 bot.answer_callback_query(call.id))
+
+
 @bot.message_handler(func=lambda msg: msg.text == 'Запросы (админ)')
 async def course_work(message):
     db = Database()
