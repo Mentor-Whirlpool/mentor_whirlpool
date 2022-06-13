@@ -143,6 +143,7 @@ class MentorsTables:
                                      'WHERE MENTOR = %s', (id_field,)),
                      self.db.execute('DELETE FROM MENTORS '
                                      'WHERE ID = %s', (id_field,)))
+        await self.db.commit()
 
     async def add_mentor_subjects(self, id_field, subjects):
         """
