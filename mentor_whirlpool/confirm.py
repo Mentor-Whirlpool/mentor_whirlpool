@@ -1,6 +1,6 @@
-from telegram import bot
+from mentor_whirlpool.telegram import bot
 from telebot import types
-from database import Database
+from mentor_whirlpool.database import Database
 from asyncio import create_task
 
 

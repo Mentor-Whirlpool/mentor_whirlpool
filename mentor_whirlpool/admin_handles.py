@@ -1,13 +1,13 @@
-from telegram import bot
+from mentor_whirlpool.telegram import bot
 from telebot import types, asyncio_filters
 from telebot.asyncio_handler_backends import State, StatesGroup
-from database import Database
+from mentor_whirlpool.database import Database
 from re import fullmatch
 from asyncio import create_task, gather
-from confirm import confirm
-from mentor_handles import mentor_start
-from students_handles import generic_start
-from support_handles import support_start
+from mentor_whirlpool.confirm import confirm
+from mentor_whirlpool.mentor_handles import mentor_start
+from mentor_whirlpool.students_handles import generic_start
+from mentor_whirlpool.support_handles import support_start
 import logging
 
 
