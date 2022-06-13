@@ -1,7 +1,7 @@
-from telegram import bot
+from mentor_whirlpool.telegram import bot
 from asyncio import gather
 
-from database import Database
+from mentor_whirlpool.database import Database
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Поддержка')

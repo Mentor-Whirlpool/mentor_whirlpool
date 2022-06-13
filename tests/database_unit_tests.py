@@ -1,6 +1,6 @@
 import asynctest
 from asyncio import gather
-from database import Database
+from mentor_whirlpool.database import Database
 import random
 import string
 

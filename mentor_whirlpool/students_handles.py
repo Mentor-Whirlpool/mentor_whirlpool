@@ -1,10 +1,10 @@
-from telegram import bot
+from mentor_whirlpool.telegram import bot
 from telebot import types
 from telebot import asyncio_filters
 from telebot.asyncio_handler_backends import State, StatesGroup
-from database import Database
+from mentor_whirlpool.database import Database
 from asyncio import gather
-from confirm import confirm
+from mentor_whirlpool.confirm import confirm
 import random
 
 

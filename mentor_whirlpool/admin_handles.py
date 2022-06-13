@@ -1,9 +1,9 @@
-from telegram import bot
+from mentor_whirlpool.telegram import bot
 from telebot import types
-from database import Database
+from mentor_whirlpool.database import Database
 from re import fullmatch
 from asyncio import create_task, gather
-from confirm import confirm
+from mentor_whirlpool.confirm import confirm
 
 
 async def admin_start(message):

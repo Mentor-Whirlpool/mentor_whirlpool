@@ -1,9 +1,7 @@
-from telegram import bot
+from mentor_whirlpool.telegram import bot
 from telebot import types
 from asyncio import create_task, gather
-
-from database import Database
-import support_request_handler
+from mentor_whirlpool.database import Database
 
 
 async def support_start(message):
