@@ -1,7 +1,7 @@
-from telegram import bot
+from mentor_whirlpool.telegram import bot
 from asyncio import gather
 
-from database import Database
+from mentor_whirlpool.database import Database
 import logging
 
 

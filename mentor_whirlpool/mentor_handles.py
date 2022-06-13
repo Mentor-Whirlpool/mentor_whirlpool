@@ -1,17 +1,9 @@
-from telegram import bot
+from mentor_whirlpool.telegram import bot
 from telebot import types
-from confirm import confirm
-from database import Database
+from mentor_whirlpool.confirm import confirm
+from mentor_whirlpool.database import Database
 from asyncio import gather, create_task
 import logging
-
-# from gettext import translation
-
-from confirm import confirm
-from database import Database
-
-
-# strings = translation('mentor', localedir='locales', languages=['RU']).gettext
 
 
 async def mentor_start(message):

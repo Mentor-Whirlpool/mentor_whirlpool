@@ -1,13 +1,13 @@
 import psycopg
 from os import environ as env
 from asyncio import gather
-from database.students_tables import StudentTables
-from database.course_works_tables import CourseWorksTables
-from database.accepted_tables import AcceptedTables
-from database.mentors_tables import MentorsTables
-from database.admins_tables import AdminsTables
-from database.supports_tables import SupportsTables
-from database.subjects_tables import SubjectsTables
+from mentor_whirlpool.database.students_tables import StudentTables
+from mentor_whirlpool.database.course_works_tables import CourseWorksTables
+from mentor_whirlpool.database.accepted_tables import AcceptedTables
+from mentor_whirlpool.database.mentors_tables import MentorsTables
+from mentor_whirlpool.database.admins_tables import AdminsTables
+from mentor_whirlpool.database.supports_tables import SupportsTables
+from mentor_whirlpool.database.subjects_tables import SubjectsTables
 
 
 class Database(StudentTables, CourseWorksTables, AcceptedTables, MentorsTables,

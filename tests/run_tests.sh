@@ -1,6 +1,6 @@
 #!/bin/sh
 
-pushd $(git rev-parse --show-toplevel)/mentor_whirlpool
+pushd $(git rev-parse --show-toplevel)
 
 python3 -m nose2 --verbose tests.database_unit_tests
 
