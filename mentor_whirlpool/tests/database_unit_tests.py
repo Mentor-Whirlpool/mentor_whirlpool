@@ -363,7 +363,20 @@ class TestDatabaseAccepted(asynctest.TestCase):
 
         for work in dbwork:
             await self.db.readmission_work(work['id'])
-        self.assertEqual(len(await self.db.get_course_works()), 3)
+        works_readmissioned = await self.db.get_course_works()
+        works_readmissioned.sort(key=lambda x: x['id'])
+        dbwork.sort(key=lambda x: x['id'])
+        self.assertListEqual(dbwork, works_readmissioned)
+        works_readmissioned_filt_subj = await self.db.get_course_works(subjects=['TCP', 'SQL'])
+        works_readmissioned_filt_subj.sort(key=lambda x: x['id'])
+        dbwork_filt_subj = [work for work in dbwork if any(map(lambda x: x in ['TCP', 'SQL'], work['subjects']))]
+        dbwork_filt_subj.sort(key=lambda x: x['id'])
+        self.assertListEqual(dbwork_filt_subj, works_readmissioned_filt_subj)
+        works_readmissioned_filt_stud = await self.db.get_course_works(student=dbwork[0]['student'])
+        works_readmissioned_filt_stud.sort(key=lambda x: x['id'])
+        dbwork_filt_stud = [work for work in dbwork if work['student'] == dbwork[0]['student']]
+        dbwork_filt_stud.sort(key=lambda x: x['id'])
+        self.assertListEqual(dbwork_filt_stud, works_readmissioned_filt_stud)
         
 
         # await self.db.modify_course_work()
