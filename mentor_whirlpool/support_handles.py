@@ -1,6 +1,5 @@
 from telegram import bot
 from telebot import types
-import json
 from asyncio import create_task, gather
 
 from database import Database
@@ -48,8 +47,7 @@ async def check_requests(message):
     for sup in requests:
         requests_list.add(
             types.InlineKeyboardButton(text=f'Пользователь {sup["name"]}',
-                                       callback_data='cbd_{"c_i": "%s", "un": "%s"}' % (
-                                           sup['chat_id'], sup['name']))
+                                       callback_data=f'cbd_{sup["chat_id"]}')
         )
     await bot.send_message(message.chat.id, 'Запросы поддержки:',
                            reply_markup=requests_list, parse_mode='Html')
@@ -73,9 +71,16 @@ async def callback_answer_support_request(call):
         await bot.send_message(call.from_user.id, 'Вы не являетесь членом группы поддержки!',
                                parse_mode='Html')
         return
-    callback_data = json.loads(call.data[call.data.index('_') + 1:])
-    chat_id = callback_data['c_i']
-    username = callback_data['un']
+
+    chat_id = call.data[call.data.index('_') + 1:]
+
+    mentor = await db.get_mentors(chat_id=chat_id)
+    if mentor:
+        username = mentor[0]['name']
+    else:
+        student = await db.get_students(chat_id=chat_id)
+        if student:
+            username = student[0]['name']
 
     curr_request = await db.get_support_requests(chat_id=chat_id)
     if not curr_request:
