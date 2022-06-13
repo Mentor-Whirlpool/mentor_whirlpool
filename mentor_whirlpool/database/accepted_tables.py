@@ -40,7 +40,7 @@ class AcceptedTables:
                                      # id      student  description
                      *[self.db.execute('INSERT INTO ACCEPTED_SUBJECTS VALUES('
                                        '%s, %s) ON CONFLICT DO NOTHING',
-                                       (work_id, subj))
+                                       (work_id, subj,))
                        for (subj,) in cw_subj],
                      self.remove_course_work(line[0]),
                      self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1 '
