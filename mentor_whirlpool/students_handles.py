@@ -145,6 +145,7 @@ async def remove_request(message):
     if await db.check_is_mentor(message.from_user.id):
         return
     id = await db.get_students(chat_id=message.chat.id)
+    print(id)
 
     if not id:
         await bot.send_message(message.from_user.id, "Пока у вас нет запросов. Скорее добавьте первый!")
