@@ -178,7 +178,8 @@ async def mentor_resume(message):
     admins = await db.get_admins()
 
     markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton('Одобрить', callback_data='add_mentor_via_admin_' + str(message.from_user.id)))
+    markup.add(
+        types.InlineKeyboardButton('Одобрить', callback_data='add_mentor_via_admin_' + str(message.from_user.id)))
 
     admin_chat_id = random.choice(admins)['chat_id']
     await gather(bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором.",
@@ -188,7 +189,9 @@ async def mentor_resume(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_request_"))
 async def select_subject_callback(call):
-    await bot.send_message(call.from_user.id, "Введите название работы:")
+    await bot.send_message(call.from_user.id,
+                           "Введите название работы. \n\n*Если вы не знаете, на какую тему будете писать работу, "
+                           "просто напишите \"Я не знаю\":*", parse_mode='Markdown')
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
@@ -207,31 +210,29 @@ async def add_own_subject_callback(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_request_"))
 async def delete_topic_callback(call):
     id_ = call.data[15:]
-    print(id_)
     db = Database()
 
     await gather(db.remove_course_work(id_), bot.answer_callback_query(call.id),
-                 bot.send_message(call.from_user.id, "Работа успешно удалена!"))
+                 bot.send_message(call.from_user.id, "Работа успешно удалена!"),
+                 bot.delete_message(call.message.chat.id, call.message.id))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_finale"))
 async def delete_finale(call):
-    print("here")
     id_ = call.data[14:]
-    print(id_)
 
     db = Database()
     student = await db.get_students(id_)
-    print(student)
     mentor = await db.get_mentors(student=id_)
-    print(mentor)
 
     await gather(db.remove_student(id_), bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id,
                                   "Ваша курсовая работа успешно удалена. Но вы всегда можете начать новую!"),
                  bot.send_message(mentor[0]['chat_id'],
                                   f"Студент @{student[0]['name']} удалил принятую вами "
-                                  f"курсовую работу \"{student[0]['course_works'][0]['description']}\""))
+                                  f"курсовую работу \"{student[0]['course_works'][0]['description']}\""),
+                 bot.delete_message(call.message.chat.id, call.message.id))
+
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))
 bot.add_custom_filter(asyncio_filters.IsDigitFilter())
