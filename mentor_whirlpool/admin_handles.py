@@ -24,6 +24,16 @@ async def admin_start(message):
     return ['Менторы', 'Запросы (админ)']
 
 
+@bot.callback_query_handler(func=lambda call: call.data.startswith('add_mentor_via_admin_'))
+async def callback_add_mentor(call):
+    db = Database()
+    new_mentor_info = await bot.get_chat(call.data[21:])
+    await gather(db.add_mentor({'name': new_mentor_info.username, 'chat_id': call.data[21:], 'subjects': None}),
+                 bot.send_message(call.data[21:], 'Теперь Вы ментор!'),
+                 bot.send_message(call.from_user.id, f'@{new_mentor_info.username} стал ментором'),
+                 bot.answer_callback_query(call.id))
+
+
 @bot.message_handler(func=lambda msg: msg.text == 'Запросы (админ)')
 async def course_work(message):
     db = Database()
@@ -99,10 +109,24 @@ async def callback_mentors_info(call):
     markup = types.InlineKeyboardMarkup()
     edit_subjects = types.InlineKeyboardButton('Изменить тему', callback_data='edit_subjects_' + call.data[14:])
     edit_students = types.InlineKeyboardButton('Изменить студентов', callback_data='edit_students_' + call.data[14:])
-    markup.add(edit_students, edit_subjects)
+    delete_mentor = types.InlineKeyboardButton('Удалить ментора', callback_data='delete_mentor_' + call.data[14:])
+    markup.add(edit_students, edit_subjects, delete_mentor)
     await bot.answer_callback_query(call.id)
     message = f'@{mentor_info["name"]}\n----Темы----\n{message_subjects}\n----Студенты----\n{message_students}'
     await bot.send_message(call.from_user.id, message, reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('delete_mentor_'))
+async def delete_mentor(call):
+    db = Database()
+    mentor_info = (await db.get_mentors(chat_id=int(call.data[14:])))[0]
+    await gather(
+        db.remove_mentor(id_field=mentor_info['id']),
+        bot.send_message(call.from_user.id, f'Ментор @{mentor_info["name"]} был удален'),
+        bot.send_message(mentor_info['chat_id'], 'Вы больше не являетесь ментором'),
+        bot.delete_message(call.from_user.id, call.message.id),
+        bot.answer_callback_query(call.id)
+    )
 
 
 # students

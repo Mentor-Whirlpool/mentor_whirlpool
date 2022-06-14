@@ -90,6 +90,9 @@ class CourseWorksTables:
                          for subj in subjects]]
             ids = await (await self.db.execute('SELECT COURSE_WORK FROM COURSE_WORKS_SUBJECTS '
                                                'WHERE SUBJECT = ANY(%s)', (subj_ids,))).fetchall()
+            ids += await (await self.db.execute('SELECT COURSE_WORK FROM ACCEPTED_SUBJECTS '
+                                                'WHERE SUBJECT = ANY(%s)', (subj_ids,))).fetchall()
+            ids = set(ids)
             works = [await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                                   'WHERE ID = %s', (id_f,))).fetchone()
                      for (id_f,) in ids]

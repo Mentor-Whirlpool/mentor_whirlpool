@@ -59,6 +59,8 @@ class MentorsTables:
             database id of the mentor
         chat_id : int
             telegram chat_id of required mentor
+        student : int
+            database id of student to search mentor by
 
         Returns
         ------
@@ -141,6 +143,7 @@ class MentorsTables:
                                      'WHERE MENTOR = %s', (id_field,)),
                      self.db.execute('DELETE FROM MENTORS '
                                      'WHERE ID = %s', (id_field,)))
+        await self.db.commit()
 
     async def add_mentor_subjects(self, id_field, subjects):
         """
