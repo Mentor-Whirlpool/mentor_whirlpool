@@ -68,14 +68,14 @@ async def works(message):
     for work in course_works:
         markup.add(
             types.InlineKeyboardButton(
-                f'@{(await db.get_students(work["student"]))[0]["name"]}\n{work["description"]}',
-                callback_data='work_' + str(work['id'])))
+                f'@{(await db.get_students(work["student"]))[0]["name"]} - {work["description"]}',
+                callback_data='mnt_work_' + str(work['id'])))
 
     await bot.send_message(message.chat.id, '<b>Доступные курсовые работы</b>',
                            reply_markup=markup, parse_mode='html')
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('work_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_work_'))
 async def callback_query_work(call):
     db = Database()
     mentor_info = (await db.get_mentors(chat_id=call.from_user.id))[0]
@@ -115,11 +115,11 @@ async def my_subjects(message):
     my_subjects_ = (await db.get_mentors(chat_id=message.from_user.id))[0]['subjects']
 
     markup = types.InlineKeyboardMarkup(row_width=3)
-    add = types.InlineKeyboardButton('Добавить', callback_data='sub_to_add')
+    add = types.InlineKeyboardButton('Добавить', callback_data='mnt_sub_to_add')
     message_subjects = '<b>Мои темы</b>\n'
 
     if my_subjects_:
-        delete = types.InlineKeyboardButton('Удалить', callback_data='sub_to_delete')
+        delete = types.InlineKeyboardButton('Удалить', callback_data='mnt_sub_to_delete')
         markup.row(add, delete)
         message_subjects += '\n'.join(my_subjects_)
     else:
@@ -143,7 +143,7 @@ async def my_subjects(message):
 #                            parse_mode='html')
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'sub_to_add')
+@bot.callback_query_handler(func=lambda call: call.data == 'mnt_sub_to_add')
 async def callback_show_subjects_to_add(call):
     db = Database()
     answ_task = create_task(bot.answer_callback_query(call.id))
@@ -157,7 +157,7 @@ async def callback_show_subjects_to_add(call):
     if subjects_to_add:
         markup = types.InlineKeyboardMarkup()
         markup.add(
-            *[types.InlineKeyboardButton(subject, callback_data='sub_add_' + subject)
+            *[types.InlineKeyboardButton(subject, callback_data='mnt_sub_add_' + subject)
               for subject in subjects_to_add])
         await bot.send_message(call.from_user.id, '<b>Все темы</b>',
                                reply_markup=markup, parse_mode='html')
@@ -167,7 +167,7 @@ async def callback_show_subjects_to_add(call):
     await answ_task
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('sub_add_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_sub_add_'))
 async def callback_add_subject(call):
     db = Database()
     answ_task = create_task(bot.answer_callback_query(call.id))
@@ -185,14 +185,14 @@ async def callback_add_subject(call):
     await answ_task
 
 
-@bot.callback_query_handler(func=lambda call: call.data == 'sub_to_delete')
+@bot.callback_query_handler(func=lambda call: call.data == 'mnt_sub_to_delete')
 async def callback_show_subjects_to_delete(call):
     db = Database()
     my_subjects_ = (await db.get_mentors(chat_id=call.from_user.id))[0]['subjects']
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
-        *[types.InlineKeyboardButton(subject, callback_data='sub_delete_' + subject)
+        *[types.InlineKeyboardButton(subject, callback_data='mnt_sub_delete_' + subject)
           for subject in my_subjects_])
     await gather(bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id,
@@ -201,16 +201,17 @@ async def callback_show_subjects_to_delete(call):
                                   parse_mode='html'))
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith('sub_delete_'))
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_sub_delete_'))
 async def callback_del_subject(call):
     db = Database()
     my_id = (await db.get_mentors(chat_id=call.from_user.id))[0]['id']
 
     await gather(db.remove_mentor_subjects(my_id, [call.data[11:]]),
-                 bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id,
                                   f'Тема <b>{call.data[11:]}</b> успешно удалена',
-                                  parse_mode='html'))
+                                  parse_mode='html'),
+                 bot.delete_message(call.from_user.id, call.message.id),
+                 bot.answer_callback_query(call.id))
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои студенты')
