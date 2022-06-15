@@ -137,12 +137,17 @@ class MentorsTables:
             (id_field,) = await (await self.db.execute('SELECT ID FROM MENTORS '
                                                 'WHERE CHAT_ID = %s', (chat_id,))
                                  ).fetchone()
+        students = await (await self.db.execute('SELECT STUDENT FROM MENTORS_STUDENTS '
+                                                'WHERE MENTOR = %s', (id_field,))).fetchall()
+
         await gather(self.db.execute('DELETE FROM MENTORS_SUBJECTS '
                                      'WHERE MENTOR = %s', (id_field,)),
                      self.db.execute('DELETE FROM MENTORS_STUDENTS '
                                      'WHERE MENTOR = %s', (id_field,)),
                      self.db.execute('DELETE FROM MENTORS '
-                                     'WHERE ID = %s', (id_field,)))
+                                     'WHERE ID = %s', (id_field,)),
+                     *[self.reject_student(id_field, stud)
+                       for (stud,) in students])
         await self.db.commit()
 
     async def add_mentor_subjects(self, id_field, subjects):
