@@ -66,7 +66,7 @@ async def works(message):
     markup = types.InlineKeyboardMarkup()
 
     for work in course_works:
-        if await db.get_accepted(id_feild=work['id']):
+        if await db.get_accepted(id_field=work['id']):
             markup.add(
                 types.InlineKeyboardButton(
                     f'@{(await db.get_students(work["student"]))[0]["name"]} - {work["description"]} (доп. запрос)',
