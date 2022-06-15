@@ -3,7 +3,7 @@ from telebot import types
 from telebot import asyncio_filters
 from telebot.asyncio_handler_backends import State, StatesGroup
 from database import Database
-from asyncio import gather
+from asyncio import gather, create_task
 from confirm import confirm
 import random
 
@@ -69,7 +69,9 @@ async def add_request(message):
         await bot.send_message(message.from_user.id, 'Вас ещё не курирует ментор')
         return
     await gather(db.readmission_work(accepted[0]['id']),
-                 bot.send_message(message.from_user.id, 'Вы успешно запросили доп. ментора'))
+                 bot.send_message(message.from_user.id,
+                                  'Вы успешно запросили доп. ментора!\n'
+                                  'Если вы передумаете, вы можете отменить запрос, используя "Удалить запрос"'))
 
 
 @bot.message_handler(state=StudentStates.add_own_subject_flag)
@@ -126,13 +128,19 @@ async def my_requests(message):
         await bot.send_message(message.from_user.id, "Пока у вас нет запросов. Скорее добавьте первый!")
         return
 
+    student_request = create_task(db.get_course_works(student=id[0]['id']))
     if await db.get_accepted(student=id[0]['id']):
         mentor = await db.get_mentors(student=id[0]['id'])
         await bot.send_message(message.from_user.id,
                                f"Текущая принятая курсовая работа: *{id[0]['course_works'][0]['description']}*\n"
                                f"Твой ментор: *@{mentor[0]['name']}*", parse_mode="Markdown")
+        student_request = await student_request
+        if student_request:
+            await bot.send_message(message.from_user.id,
+                                   'У вас имеется запрос на доп. ментора по этой работе!'
+                                   'Если хотите его удалить, воспользуйтесь "Удалить запрос"')
         return
-    student_request = await db.get_course_works(student=id[0]['id'])
+    student_request = await student_request
     await gather(*[bot.send_message(message.chat.id,
                                     f"*Работа №{course_work['id']}*\nПредмет: {course_work['subjects'][0]}\n"
                                     f"Тема работы: {course_work['description']}", parse_mode="Markdown")
@@ -150,16 +158,26 @@ async def remove_request(message):
         await bot.send_message(message.from_user.id, "Пока у вас нет запросов. Скорее добавьте первый!")
         return
 
+    student_request = create_task(db.get_course_works(student=id[0]['id']))
     markup = types.InlineKeyboardMarkup(row_width=1)
     if await db.get_accepted(student=id[0]['id']):
+        student_request = await student_request
+        if student_request:
+            markup.add(types.InlineKeyboardButton('Запрос на доп. ментора', callback_data=f"delete_request_{student_request[0]['id']}"))
+            markup.add(types.InlineKeyboardButton(f"Курсовая работа \"{id[0]['course_works'][0]['description']}\"",
+                                                  callback_data=f"delete_finale_{id[0]['id']}"))
+            await bot.send_message(message.from_user.id, 'Что вы хотите удалить?', reply_markup=markup)
+            return
+
         markup.add(types.InlineKeyboardButton(f"Удалить курсовую \"{id[0]['course_works'][0]['description']}\"",
                                               callback_data=f"delete_finale_{id[0]['id']}"))
 
-        await bot.send_message(message.from_user.id, 'Внимание! Вы собираетесь удалить свою курсовую работу!',
+        await bot.send_message(message.from_user.id, 'Внимание! Вы собираетесь удалить свою курсовую работу!\n'
+                                                     'Вас больше не будут курировать менторы',
                                reply_markup=markup)
         return
     else:
-        student_request = await db.get_course_works(student=id[0]['id'])
+        student_request = await student_request
 
         for course_work in student_request:
             markup.add(
