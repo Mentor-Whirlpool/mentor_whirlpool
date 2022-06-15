@@ -116,7 +116,7 @@ async def save_request(message):
     await gather(db.add_course_work(student_dict), bot.delete_state(message.from_user.id, message.chat.id),
                  bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
                                                    "\n\nЕсли вы захотите запросить дополнительного ментора, нажмите кнопку "
-                                                   "*\"Запросить доп. ментора\"*", parse_mode="Markdown"))
+                                                   "<b>\"Запросить доп. ментора\"</b>", parse_mode="Html"))
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои запросы')
@@ -134,8 +134,8 @@ async def my_requests(message):
     if await db.get_accepted(student=id[0]['id']):
         mentor = await db.get_mentors(student=id[0]['id'])
         await bot.send_message(message.from_user.id,
-                               f"Текущая принятая курсовая работа: *{id[0]['course_works'][0]['description']}*\n"
-                               f"Твой ментор: *@{mentor[0]['name']}*", parse_mode="Markdown")
+                               f"Текущая принятая курсовая работа: <b>{id[0]['course_works'][0]['description']}</b>\n"
+                               f"Твой ментор: <b>@{mentor[0]['name']}</b>", parse_mode="Html")
         student_request = await student_request
         if student_request:
             await bot.send_message(message.from_user.id,
@@ -144,8 +144,8 @@ async def my_requests(message):
         return
     student_request = await student_request
     await gather(*[bot.send_message(message.chat.id,
-                                    f"*Работа №{course_work['id']}*\nПредмет: {course_work['subjects'][0]}\n"
-                                    f"Тема работы: {course_work['description']}", parse_mode="Markdown")
+                                    f"<b>Работа №{course_work['id']}</b>\nПредмет: {course_work['subjects'][0]}\n"
+                                    f"Тема работы: {course_work['description']}", parse_mode="Html")
                    for course_work in student_request])
 
 
@@ -209,9 +209,9 @@ async def mentor_resume(message):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_request_"))
 async def select_subject_callback(call):
-    await bot.send_message(call.from_user.id, f"*Тема: {call.data[12:]}*\n\n"
-                                              f"Введите название работы. \n\n*Если вы не знаете, на какую тему будете писать работу, "
-                                              f"просто напишите \"Я не знаю\":*", parse_mode='Markdown')
+    await bot.send_message(call.from_user.id, f"<b>Тема: {call.data[12:]}</b>\n\n"
+                                              f"Введите название работы. \n\n<b>Если вы не знаете, на какую тему будете писать работу, "
+                                              f"просто напишите \"Я не знаю\":</b>", parse_mode='Html')
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
