@@ -131,7 +131,7 @@ class AcceptedTables:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         if id_field is not None:
-            res = [await (await self.db.execute('SELECT * FROM ACCEPTED'
+            res = [await (await self.db.execute('SELECT * FROM ACCEPTED '
                                                 'WHERE ID = %s', (id_field,))).fetchone()]
             return await self.assemble_courses_dict(res)
         if subjects:
