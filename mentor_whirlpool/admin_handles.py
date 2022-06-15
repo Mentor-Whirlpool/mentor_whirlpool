@@ -223,7 +223,7 @@ async def callback_delete_student(call):
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
 
     await gather(
-        db.reject_work(mentor_id, work_id),
+        db.reject_student(mentor_id, student_id),
         bot.send_message(mentor_chat_id, f'Студент @{student_info["name"]} удален'),
         bot.send_message(student_info['chat_id'],
                          f'@{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]} больше не Ваш ментор'),
