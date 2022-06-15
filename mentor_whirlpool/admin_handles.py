@@ -102,7 +102,7 @@ async def list_mentors(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_choose_mentor_'))
 async def callback_mentors_info(call):
     db = Database()
-    mentor_info = (await db.get_mentors(chat_id=int(call.data[14:])))[0]
+    mentor_info = (await db.get_mentors(chat_id=int(call.data[20:])))[0]
     message_subjects = 'Нет выбранных тем'
     message_students = 'Нет студентов'
     if mentor_info['subjects']:
@@ -110,10 +110,10 @@ async def callback_mentors_info(call):
     if mentor_info['students']:
         message_students = '\n'.join(student['name'] for student in mentor_info['students'])
     markup = types.InlineKeyboardMarkup()
-    edit_subjects = types.InlineKeyboardButton('Изменить тему', callback_data='admin_edit_subjects_' + call.data[14:])
+    edit_subjects = types.InlineKeyboardButton('Изменить тему', callback_data='admin_edit_subjects_' + call.data[20:])
     edit_students = types.InlineKeyboardButton('Изменить студентов',
-                                               callback_data='admin_edit_students_' + call.data[14:])
-    delete_mentor = types.InlineKeyboardButton('Удалить ментора', callback_data='admin_delete_mentor_' + call.data[14:])
+                                               callback_data='admin_edit_students_' + call.data[20:])
+    delete_mentor = types.InlineKeyboardButton('Удалить ментора', callback_data='admin_delete_mentor_' + call.data[20:])
     markup.add(edit_students, edit_subjects, delete_mentor)
     await bot.answer_callback_query(call.id)
     message = f'@{mentor_info["name"]}\n----Темы----\n{message_subjects}\n----Студенты----\n{message_students}'
@@ -123,7 +123,7 @@ async def callback_mentors_info(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_delete_mentor_'))
 async def delete_mentor(call):
     db = Database()
-    mentor_info = (await db.get_mentors(chat_id=int(call.data[14:])))[0]
+    mentor_info = (await db.get_mentors(chat_id=int(call.data[20:])))[0]
     await gather(
         db.remove_mentor(id_field=mentor_info['id']),
         bot.send_message(call.from_user.id, f'Ментор @{mentor_info["name"]} был удален'),
@@ -138,8 +138,8 @@ async def delete_mentor(call):
 async def edit_students(call):
     markup = types.InlineKeyboardMarkup()
     add = types.InlineKeyboardButton('Добавить студента',
-                                     callback_data='admin_add_student_subject_choice_' + call.data[14:])
-    delete = types.InlineKeyboardButton('Удалить студента', callback_data='admin_delete_student_info_' + call.data[14:])
+                                     callback_data='admin_add_student_subject_choice_' + call.data[20:])
+    delete = types.InlineKeyboardButton('Удалить студента', callback_data='admin_delete_student_info_' + call.data[20:])
     markup.add(add, delete)
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, 'Что сделать со студентами?', reply_markup=markup)
@@ -148,12 +148,12 @@ async def edit_students(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_add_student_subject_choice_'))
 async def callback_add_student_subject_choice(call):
     db = Database()
-    mentor_subjects = (await db.get_mentors(chat_id=call.data[27:]))[0]['subjects']
+    mentor_subjects = (await db.get_mentors(chat_id=call.data[33:]))[0]['subjects']
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
         *[types.InlineKeyboardButton(subject,
-                                     callback_data='admin_add_student_with_subject_' + subject + '_' + call.data[27:])
+                                     callback_data='admin_add_student_with_subject_' + subject + '_' + call.data[33:])
           for
           subject in mentor_subjects])
 
@@ -163,7 +163,7 @@ async def callback_add_student_subject_choice(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_add_student_with_subject_'))
 async def callback_add_student(call):
-    subject, mentor_chat_id = call.data[25:].split('_')
+    subject, mentor_chat_id = call.data[31:].split('_')
 
     force = types.ForceReply(selective=False)
     await bot.send_message(call.from_user.id,
@@ -209,8 +209,8 @@ async def callback_delete_student_info(call):
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
         *[types.InlineKeyboardButton(f'{student["name"]}',
-                                     callback_data=f'admin_delete_stud_{call.data[20:]}_{str(student["course_works"][0]["id"])}_{student["id"]}')
-          for student in (await db.get_mentors(chat_id=int(call.data[20:])))[0]['students']])
+                                     callback_data=f'admin_delete_stud_{call.data[26:]}_{str(student["course_works"][0]["id"])}_{student["id"]}')
+          for student in (await db.get_mentors(chat_id=int(call.data[26:])))[0]['students']])
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, 'Выберите какого студента удалить', reply_markup=markup)
 
@@ -218,7 +218,7 @@ async def callback_delete_student_info(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_delete_stud_'))
 async def callback_delete_student(call):
     db = Database()
-    mentor_chat_id, work_id, student_id = call.data[12:].split('_')
+    mentor_chat_id, work_id, student_id = call.data[18:].split('_')
     student_info = (await db.get_students(id_field=student_id))[0]
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
 
@@ -236,8 +236,8 @@ async def callback_delete_student(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_edit_subjects_'))
 async def callback_edit_subjects(call):
     markup = types.InlineKeyboardMarkup()
-    add = types.InlineKeyboardButton('Добавить тему', callback_data='admin_add_subject_' + call.data[14:])
-    delete = types.InlineKeyboardButton('Удалить тему', callback_data='admin_delete_subject_info_' + call.data[14:])
+    add = types.InlineKeyboardButton('Добавить тему', callback_data='admin_add_subject_' + call.data[20:])
+    delete = types.InlineKeyboardButton('Удалить тему', callback_data='admin_delete_subject_info_' + call.data[20:])
     markup.add(add, delete)
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, 'Что сделать с темами?', reply_markup=markup)
@@ -246,23 +246,23 @@ async def callback_edit_subjects(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_delete_subject_info_'))
 async def callback_delete_subject_info(call):
     db = Database()
-    mentor_subjects = (await db.get_mentors(chat_id=call.data[20:]))[0]['subjects']
+    mentor_subjects = (await db.get_mentors(chat_id=call.data[26:]))[0]['subjects']
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
-        *[types.InlineKeyboardButton(subject, callback_data='admin_delete_subject_' + subject + '_' + call.data[20:])
+        *[types.InlineKeyboardButton(subject, callback_data='admin_delete_subject_' + subject + '_' + call.data[26:])
           for
           subject in mentor_subjects])
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id,
-                           f'Удалить тему у ментора @{(await db.get_mentors(chat_id=call.data[20:]))[0]["name"]}',
+                           f'Удалить тему у ментора @{(await db.get_mentors(chat_id=call.data[26:]))[0]["name"]}',
                            reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_delete_subject_'))
 async def callback_delete_subject(call):
     db = Database()
-    subject, mentor_chat_id = call.data[15:].split('_')
+    subject, mentor_chat_id = call.data[21:].split('_')
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
 
     await gather(
@@ -276,7 +276,7 @@ async def callback_delete_subject(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_add_subject_'))
 async def callback_add_subject_info(call):
-    mentor_chat_id = call.data[12:]
+    mentor_chat_id = call.data[18:]
 
     force = types.ForceReply(selective=False)
     await bot.send_message(call.from_user.id, 'Добавлять тему/темы СТРОГО в формате <pre>тема1;тема2;тема3</pre>',

@@ -85,9 +85,9 @@ async def works(message):
 async def callback_query_work(call):
     db = Database()
     mentor_info = (await db.get_mentors(chat_id=call.from_user.id))[0]
-    course_work_info = (await db.get_course_works(int(call.data[5:])))[0]
+    course_work_info = (await db.get_course_works(int(call.data[9:])))[0]
 
-    await gather(db.accept_work(mentor_info['id'], call.data[5:]),
+    await gather(db.accept_work(mentor_info['id'], call.data[9:]),
                  bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id,
                                   f'Вы взялись за <b>{course_work_info["description"]}</b>\n'
@@ -179,14 +179,14 @@ async def callback_add_subject(call):
     answ_task = create_task(bot.answer_callback_query(call.id))
     myself = (await db.get_mentors(chat_id=call.from_user.id))[0]
 
-    if not myself['subjects'] or call.data[8:] not in myself['subjects']:
-        await gather(db.add_mentor_subjects(myself['id'], [call.data[8:]]),
+    if not myself['subjects'] or call.data[12:] not in myself['subjects']:
+        await gather(db.add_mentor_subjects(myself['id'], [call.data[12:]]),
                      bot.send_message(call.from_user.id,
-                                      f'Тема <b>{call.data[8:]}</b> успешно добавлена',
+                                      f'Тема <b>{call.data[12:]}</b> успешно добавлена',
                                       parse_mode='html'))
     else:
         await bot.send_message(call.from_user.id,
-                               f'Тема <b>{call.data[8:]}</b> уже была добавлена',
+                               f'Тема <b>{call.data[12:]}</b> уже была добавлена',
                                parse_mode='html')
     await answ_task
 
@@ -212,9 +212,9 @@ async def callback_del_subject(call):
     db = Database()
     my_id = (await db.get_mentors(chat_id=call.from_user.id))[0]['id']
 
-    await gather(db.remove_mentor_subjects(my_id, [call.data[11:]]),
+    await gather(db.remove_mentor_subjects(my_id, [call.data[15:]]),
                  bot.send_message(call.from_user.id,
-                                  f'Тема <b>{call.data[11:]}</b> успешно удалена',
+                                  f'Тема <b>{call.data[15:]}</b> успешно удалена',
                                   parse_mode='html'),
                  bot.delete_message(call.from_user.id, call.message.id),
                  bot.answer_callback_query(call.id))
