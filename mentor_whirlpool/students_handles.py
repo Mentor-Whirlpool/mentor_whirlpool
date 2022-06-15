@@ -112,7 +112,9 @@ async def save_request(message):
                          bot.send_message(message.chat.id, "Работа с таким именем уже добавлена!"))
             return
     await gather(db.add_course_work(student_dict), bot.delete_state(message.from_user.id, message.chat.id),
-                 bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора."))
+                 bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
+                                                   "\n\nЕсли вы захотите запросить дополнительного ментора, нажмите кнопку "
+                                                   "*\"Запросить доп. ментора\"*", parse_mode="Markdown"))
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои запросы')
@@ -184,18 +186,19 @@ async def mentor_resume(message):
     admin_chat_id = random.choice(admins)['chat_id']
     await gather(bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором.",
                                   reply_markup=markup),
-                 bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!"))
+                 bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!\n"))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_request_"))
 async def select_subject_callback(call):
-    await bot.send_message(call.from_user.id,
-                           "Введите название работы. \n\n*Если вы не знаете, на какую тему будете писать работу, "
-                           "просто напишите \"Я не знаю\":*", parse_mode='Markdown')
+    await bot.send_message(call.from_user.id, f"*Тема: {call.data[12:]}*\n\n"
+                                              f"Введите название работы. \n\n*Если вы не знаете, на какую тему будете писать работу, "
+                                              f"просто напишите \"Я не знаю\":*", parse_mode='Markdown')
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
         data['subject'] = call.data[12:]
+
     await bot.answer_callback_query(call.id)
 
 
