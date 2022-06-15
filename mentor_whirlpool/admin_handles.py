@@ -77,8 +77,8 @@ async def list_mentors(message):
 
         if not mentor['subjects']:
             tasks.append(
-                bot.send_message(message.chat.id, f'*@{mentor["name"]}*\nНет выбранных тем', reply_markup=markup,
-                                 parse_mode='markdown'))
+                bot.send_message(message.chat.id, f'<b>@{mentor["name"]}</b>\nНет выбранных тем', reply_markup=markup,
+                                 parse_mode='html'))
             continue
 
         subjects_count_dict = dict.fromkeys(mentor['subjects'], 0)
@@ -93,8 +93,8 @@ async def list_mentors(message):
 
         message_subjects = '\n'.join(f'{k} - {v}' for k, v in subjects_count_dict.items())
 
-        tasks.append(bot.send_message(message.chat.id, f'*@{mentor["name"]}*\n{message_subjects}', reply_markup=markup,
-                                      parse_mode='markdown'))
+        tasks.append(bot.send_message(message.chat.id, f'<b>@{mentor["name"]}</b>\n{message_subjects}', reply_markup=markup,
+                                      parse_mode='html'))
 
     await gather(*tasks)
 
@@ -298,9 +298,9 @@ async def callback_user_add_subject(message):
         await db.add_subject(subject)
         mentor_subjects = (await db.get_mentors(chat_id=mentor_chat_id))[0]['subjects']
         if mentor_subjects and subject in mentor_subjects:
-            await bot.send_message(message.from_user.id, f'Тема *{subject}* уже была добавлена', parse_mode='markdown')
+            await bot.send_message(message.from_user.id, f'Тема <b>{subject}</b> уже была добавлена', parse_mode='html')
             return
 
         add_mentor_sub_task = create_task(db.add_mentor_subjects(mentor_id, [subject]))
-        await bot.send_message(message.chat.id, f'Тема *{subject}* успешно добавлена', parse_mode='markdown')
+        await bot.send_message(message.chat.id, f'Тема <b>{subject}</b> успешно добавлена', parse_mode='html')
         await add_mentor_sub_task
