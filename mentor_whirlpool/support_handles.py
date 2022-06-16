@@ -1,6 +1,7 @@
 from telegram import bot
 from telebot import types
 from asyncio import create_task, gather
+import logging
 
 from database import Database
 import support_request_handler
@@ -34,10 +35,10 @@ async def check_requests(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
+    logging.debug(f'chat_id: {message.from_user.id} is in SUPPORT_REQUESTS')
     db = Database()
     if not await db.check_is_support(chat_id=message.chat.id):
-        await bot.send_message(message.chat.id, 'Вы не являетесь членом группы поддержки!',
-                               parse_mode='Html')
+        logging.warn(f'chat_id: {message.from_user.id} is not a support')
         return
     requests = await db.get_support_requests()
     if not requests:
@@ -49,8 +50,10 @@ async def check_requests(message):
             types.InlineKeyboardButton(text=f'Пользователь {sup["name"]}',
                                        callback_data=f'cbd_{sup["chat_id"]}')
         )
+    logging.debug(f'chat_id: {message.from_user.id} preparing SUPPORT_REQUESTS')
     await bot.send_message(message.chat.id, 'Запросы поддержки:',
                            reply_markup=requests_list, parse_mode='Html')
+    logging.debug(f'chat_id: {message.from_user.id} done SUPPORT_REQUESTS')
 
 
 @bot.callback_query_handler(lambda call: call.data.startswith('cbd_'))
@@ -66,10 +69,10 @@ async def callback_answer_support_request(call):
         A pyTelegramBotAPI Message type class
     """
     answ_task = create_task(bot.answer_callback_query(call.id))
+    logging.debug(f'chat_id: {call.from_user.id} is in cbd support')
     db = Database()
     if not await db.check_is_support(chat_id=call.from_user.id):
-        await bot.send_message(call.from_user.id, 'Вы не являетесь членом группы поддержки!',
-                               parse_mode='Html')
+        logging.warn(f'chat_id: {call.from_user.id} is not a support')
         return
 
     chat_id = call.data[call.data.index('_') + 1:]
@@ -84,14 +87,17 @@ async def callback_answer_support_request(call):
 
     curr_request = await db.get_support_requests(chat_id=chat_id)
     if not curr_request:
+        logging.warn(f'chat_id: {call.from_user.id} expired request')
         await gather(bot.send_message(call.from_user.id,
                                       f'Запрос пользователя @{username} больше не актуален'),
-                     bot.answer_callback_query(call.id))
+                     answ_task)
         return
     curr_request = curr_request[0]
     new_keyboard = types.InlineKeyboardMarkup()
     new_keyboard.add(types.InlineKeyboardButton(text=f'Помочь пользователю {username}', url=f't.me/{username}'))
+    logging.debug(f'chat_id: {call.from_user.id} preparing cbd support')
     await gather(db.remove_support_request(curr_request['id']),
                  bot.send_message(chat_id, f'Член поддержки @{call.from_user.username} скоро окажет вам помощь'),
                  bot.edit_message_reply_markup(call.from_user.id, call.message.id, reply_markup=new_keyboard),
                  answ_task)
+    logging.debug(f'chat_id: {call.from_user.id} done cbd support')
