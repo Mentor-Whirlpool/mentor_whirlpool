@@ -254,6 +254,13 @@ async def select_subject_callback(call):
                                               f"Введите название работы. \n\n<b>Если вы не знаете, на какую тему будете писать работу, "
                                               f"просто напишите \"Я не знаю\":</b>", parse_mode='Html')
 
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("add_request_"))
+async def select_subject_callback(call):
+    await bot.send_message(call.from_user.id, f"*Тема: {call.data[12:]}*\n\n"
+                                              f"Введите название работы. \n\n*Если вы не знаете, на какую тему будете писать работу, "
+                                              f"просто напишите \"Я не знаю\":*", parse_mode='Markdown')
+
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
         data['subject'] = call.data[12:]
