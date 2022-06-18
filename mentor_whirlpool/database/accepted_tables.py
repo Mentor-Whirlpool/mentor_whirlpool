@@ -55,7 +55,7 @@ class AcceptedTables:
                        for (id_f,) in to_delete])
         await self.db.commit()
 
-    async def reject_work(self, mentor_id, work_id):
+    async def reject_student(self, mentor_id, stud_id):
         """
         Disown a student
 
@@ -67,8 +67,8 @@ class AcceptedTables:
         ----------
         mentor_id : int
             database id of the mentor
-        work_id : int
-            database id of the course work
+        stud_id : int
+            database id of the student
 
         Raises
         ------
@@ -79,9 +79,9 @@ class AcceptedTables:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         line = await (await self.db.execute('SELECT * FROM ACCEPTED '
-                                            'WHERE ID = %s', (work_id,))).fetchone()
+                                            'WHERE STUDENT = %s', (stud_id,))).fetchone()
         cw_subj = await (await self.db.execute('SELECT SUBJECT FROM ACCEPTED_SUBJECTS '
-                                               'WHERE COURSE_WORK = %s', (work_id,))).fetchall() 
+                                               'WHERE COURSE_WORK = %s', (line[0],))).fetchall() 
         if line is None:
             return
         await gather(self.db.execute('INSERT INTO COURSE_WORKS VALUES('
@@ -90,12 +90,12 @@ class AcceptedTables:
                      #                id      student  description
                      *[self.db.execute('INSERT INTO COURSE_WORKS_SUBJECTS VALUES('
                                        '%s, %s) ON CONFLICT DO NOTHING',
-                                       (work_id, subj))
+                                       (line[0], subj))
                        for (subj,) in cw_subj],
                      self.db.execute('DELETE FROM ACCEPTED_SUBJECTS '
-                                     'WHERE COURSE_WORK = %s', (work_id,)),
+                                     'WHERE COURSE_WORK = %s', (line[0],)),
                      self.db.execute('DELETE FROM ACCEPTED '
-                                     'WHERE ID = %s', (work_id,)),
+                                     'WHERE ID = %s', (line[0],)),
                      self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1 '
                                      'WHERE ID = %s', (mentor_id,)),
                      self.db.execute('DELETE FROM MENTORS_STUDENTS '
@@ -131,7 +131,7 @@ class AcceptedTables:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         if id_field is not None:
-            res = [await (await self.db.execute('SELECT * FROM ACCEPTED'
+            res = [await (await self.db.execute('SELECT * FROM ACCEPTED '
                                                 'WHERE ID = %s', (id_field,))).fetchone()]
             return await self.assemble_courses_dict(res)
         if subjects:
