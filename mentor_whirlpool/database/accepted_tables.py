@@ -36,11 +36,11 @@ class AcceptedTables:
         accepted_from_stud = await self.get_accepted(student=line[1])
         if not accepted_from_stud:
             await gather(self.db.execute('INSERT INTO ACCEPTED VALUES('
-                                         '%s, %s, %s) '
+                                         '%s, %s, %s)',
                                          (line[0], line[1], line[2],)),
                                        # id      student  description
                          *[self.db.execute('INSERT INTO ACCEPTED_SUBJECTS VALUES('
-                                           '%s, %s) ON CONFLICT DO NOTHING',
+                                           '%s, %s) ON CONFLICT (COURSE_WORK, SUBJECT) DO NOTHING',
                                            (work_id, subj,))
                            for (subj,) in cw_subj])
         else:
