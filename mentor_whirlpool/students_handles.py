@@ -31,7 +31,7 @@ async def generic_start(message):
     iterable
         Iterable with all handles texts
     """
-    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Запросить доп. ментора', 'Хочу стать ментором',
+    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Хочу стать ментором',
                 'Поддержка']
     return commands
 
@@ -46,41 +46,45 @@ async def add_request(message):
 
     id = await db.get_students(chat_id=message.chat.id)
 
-    if id and await db.get_accepted(student=id[0]['id']):
-        await bot.send_message(message.from_user.id, "Вас уже обслуживает ментор")
+    stud_accepted = []
+    if id:
+        stud_accepted = await db.get_accepted(student=id[0]['id'])
+    markup = types.InlineKeyboardMarkup([types.InlineKeyboardButton(sub, callback_data=f'readm_{sub}')
+                                         for sub in await db.get_subjects()
+                                         if sub not in stud_accepted], row_width=1)
+    if id and stud_accepted:
+        await bot.send_message(message.from_user.id, "Вас уже обслуживает ментор\n"
+                                                     "Создаём запрос на доп. ментора!\n"
+                                                     "Выберите тему, которая вас интересует:",
+                                                     reply_markup=markup)
         return
-    markup = types.InlineKeyboardMarkup(row_width=1)
-    subjects_ = await db.get_subjects()
-    for sub in subjects_:
-        markup.add(types.InlineKeyboardButton(sub, callback_data=f"add_request_{sub}"))
-    markup.add(types.InlineKeyboardButton("Добавить свою тему", callback_data="own_request"))
 
     logging.debug(f'chat_id: {message.from_user.id} preparing ADD_REQUEST')
     await bot.send_message(message.chat.id, "Добавить запрос:", reply_markup=markup)
     logging.debug(f'chat_id: {message.from_user.id} done ADD_REQUEST')
 
 
-@bot.message_handler(func=lambda msg: msg.text == 'Запросить доп. ментора')
-async def add_request(message):
+@bot.callback_query_handler(func=lambda call: call.data.startswith == 'readm_')
+async def add_request(call):
     db = Database()
-    logging.debug(f'chat_id: {message.from_user.id} is in ADDITIONAL_MENTOR')
-    if await db.check_is_mentor(message.from_user.id):
-        logging.warn(f'chat_id: {message.from_user.id} is a mentor')
-        return
+    logging.debug(f'chat_id: {call.from_user.id} is in ADDITIONAL_MENTOR')
 
-    id = await db.get_students(chat_id=message.chat.id)
+    id = await db.get_students(chat_id=call.chat.id)
     accepted = None
     if id:
         accepted = await db.get_accepted(student=id[0]['id'])
+    # should be possible if button is clicked after student decides to nuke himself
     if not accepted:
-        await bot.send_message(message.from_user.id, 'Вас ещё не курирует ментор')
+        await bot.send_message(call.from_user.id, 'Вас ещё не курирует ментор')
         return
-    logging.debug(f'chat_id: {message.from_user.id} preparing ADD_REQUEST')
-    await gather(db.readmission_work(accepted[0]['id']),
-                 bot.send_message(message.from_user.id,
+
+    logging.debug(f'chat_id: {call.from_user.id} preparing ADD_REQUEST')
+    await gather(db.readmission_work(accepted[0]['id'], call.data[6:]),
+                 bot.send_message(call.from_user.id,
                                   'Вы успешно запросили доп. ментора!\n'
-                                  'Если вы передумаете, вы можете отменить запрос, используя "Удалить запрос"'))
-    logging.debug(f'chat_id: {message.from_user.id} done ADD_REQUEST')
+                                  'Если вы передумаете, вы можете отменить '
+                                  'запрос, используя "Удалить запрос"'))
+    logging.debug(f'chat_id: {call.from_user.id} done ADD_REQUEST')
 
 
 @bot.message_handler(state=StudentStates.add_own_subject_flag)
