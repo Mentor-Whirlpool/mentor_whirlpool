@@ -151,17 +151,17 @@ async def my_subjects(message):
 
 # мои темы получаешь еще кнопки с темам, тыкаешь на кнопку получаешь список курсачей по этой теме (тоже кнопками) -> жмешь на курсач и принимаешь его
 
-# @bot.callback_query_handler(func=lambda call: call.data.startswith('subject_'))
-# async def callback_show_course_works_by_subject(call):
-#     db = Database()
-#     markup = types.InlineKeyboardMarkup(row_width=3)
-#     markup.add(
-#         *[types.InlineKeyboardButton(f'{work["student"]} {work["description"]}',
-#                                      callback_data='work_' + str(work['id'])) for work in
-#           await db.get_course_works([call.data[8:]])])  # добавление курсачей будет в callback_query_work
-#     await bot.answer_callback_query(call.id)
-#     await bot.send_message(call.from_user.id, f'Курсовые работы по теме *{call.data[8:]}*', reply_markup=markup,
-#                            parse_mode='html')
+@bot.callback_query_handler(func=lambda call: call.data.startswith('subject_'))
+async def callback_show_course_works_by_subject(call):
+    db = Database()
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(
+        *[types.InlineKeyboardButton(f'{work["student"]} {work["description"]}',
+                                     callback_data='work_' + str(work['id'])) for work in
+          await db.get_course_works([call.data[8:]])])  # добавление курсачей будет в callback_query_work
+    await bot.answer_callback_query(call.id)
+    await bot.send_message(call.from_user.id, f'Курсовые работы по теме *{call.data[8:]}*', reply_markup=markup,
+                           parse_mode='html')
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'mnt_sub_to_add')
@@ -226,7 +226,6 @@ async def callback_show_subjects_to_delete(call):
                                   reply_markup=markup,
                                   parse_mode='html'))
     logging.debug(f'chat_id: {call.from_user.id} done mnt_sub_to_delete')
-
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_sub_delete_'))
