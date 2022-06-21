@@ -33,16 +33,22 @@ class AcceptedTables:
         to_delete.remove((line[0],))
         cw_subj = await (await self.db.execute('SELECT SUBJECT FROM COURSE_WORKS_SUBJECTS '
                                                'WHERE COURSE_WORK = %s', (work_id,))).fetchall()
-        await gather(self.db.execute('INSERT INTO ACCEPTED VALUES('
-                                     '%s, %s, %s) '
-                                     'ON CONFLICT (STUDENT) DO NOTHING',
-                                     (line[0], line[1], line[2],)),
-                                     # id      student  description
-                     *[self.db.execute('INSERT INTO ACCEPTED_SUBJECTS VALUES('
-                                       '%s, %s) ON CONFLICT DO NOTHING',
-                                       (work_id, subj,))
-                       for (subj,) in cw_subj],
-                     self.remove_course_work(line[0]),
+        accepted_from_stud = await self.get_accepted(student=line[1])
+        if not accepted_from_stud:
+            await gather(self.db.execute('INSERT INTO ACCEPTED VALUES('
+                                         '%s, %s, %s) '
+                                         (line[0], line[1], line[2],)),
+                                       # id      student  description
+                         *[self.db.execute('INSERT INTO ACCEPTED_SUBJECTS VALUES('
+                                           '%s, %s) ON CONFLICT DO NOTHING',
+                                           (work_id, subj,))
+                           for (subj,) in cw_subj])
+        else:
+            await gather(*[self.db.execute('INSERT INTO ACCEPTED_SUBJECTS VALUES('
+                                           '%s, %s)',
+                                           (accepted_from_stud[0]['id'], subj,))
+                           for (subj,) in cw_subj])
+        await gather(self.remove_course_work(line[0]),
                      self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1 '
                                      'WHERE ID = %s', (mentor_id,)),
                      self.db.execute('INSERT INTO MENTORS_STUDENTS VALUES('
@@ -103,7 +109,7 @@ class AcceptedTables:
                                      'STUDENT = %s', (mentor_id, line[1],)))
         await self.db.commit()
 
-    async def readmission_work(self, work_id):
+    async def readmission_work(self, work_id, new_subj=None):
         """
         Copies a line from ACCEPTED table to COURSE_WORKS table
 
@@ -111,6 +117,9 @@ class AcceptedTables:
         ----------
         work_id : int
             database id of the course work
+        new_subj : str
+            TODO: str -> int (id)
+            new subject of a course work
 
         Raises
         ------
@@ -122,9 +131,16 @@ class AcceptedTables:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         line = await (await self.db.execute('SELECT * FROM ACCEPTED '
                                             'WHERE ID = %s', (work_id,))).fetchone()
-        await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
-                              '%s, %s, %s)',
-                              (line[0], line[1], line[2],))
+        (cw_id,) = await (await self.db.execute('INSERT INTO COURSE_WORKS VALUES('
+                                                'DEFAULT, %s, %s) '
+                                                'RETURNING ID',
+                                                (line[1], line[2],))).fetchone()
+        if new_subj is not None:
+            (subj_id,) = await (await self.db.execute('SELECT ID FROM SUBJECTS '
+                                                      'WHERE SUBJECT = %s',
+                                                      (new_subj,))).fetchone()
+            await self.db.execute('INSERT INTO COURSE_WORKS_SUBJECTS VALUES('
+                                  '%s, %s)', (cw_id, subj_id))
         await self.db.commit()
 
     async def get_accepted(self, id_field=None, subjects=[], student=None):
