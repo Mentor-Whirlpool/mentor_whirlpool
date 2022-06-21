@@ -69,9 +69,9 @@ async def list_mentors(message):
         A pyTelegramBotAPI Message type class
     """
     db = Database()
-    if not await db.check_is_admin(message.chat.id):
+    if not await db.check_is_admin(message.from_user.id):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
-        await bot.send_message(message.chat.id, 'Вы не являетесь админом')
+        await bot.send_message(message.from_user.id, 'Вы не являетесь админом')
         return
 
     logging.debug(f'chat_id: {message.from_user.id} in MENTORS')
@@ -127,9 +127,9 @@ async def callback_mentors_info(call):
     markup.add(edit_students, edit_subjects, delete_mentor)
     await bot.answer_callback_query(call.id)
     message = f'@{mentor_info["name"]}\n----Темы----\n{message_subjects}\n----Студенты----\n{message_students}'
-    logging.debug(f'chat_id: {message.from_user.id} preparing admin_choose_mentor')
+    logging.debug(f'chat_id: {call.from_user.id} preparing admin_choose_mentor')
     await bot.send_message(call.from_user.id, message, reply_markup=markup)
-    logging.debug(f'chat_id: {message.from_user.id} sent admin_choose_mentor')
+    logging.debug(f'chat_id: {call.from_user.id} sent admin_choose_mentor')
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_delete_mentor_'))
@@ -137,7 +137,7 @@ async def delete_mentor(call):
     db = Database()
     mentor_info = (await db.get_mentors(chat_id=int(call.data[20:])))[0]
     logging.debug(f'chat_id: {call.from_user.id} chosen mentor {mentor_info}')
-    logging.debug(f'chat_id: {message.from_user.id} preparing admin_delete_mentor')
+    logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_mentor')
     await gather(
         db.remove_mentor(id_field=mentor_info['id']),
         bot.send_message(call.from_user.id, f'Ментор @{mentor_info["name"]} был удален'),
@@ -145,7 +145,7 @@ async def delete_mentor(call):
         bot.delete_message(call.from_user.id, call.message.id),
         bot.answer_callback_query(call.id)
     )
-    logging.debug(f'chat_id: {message.from_user.id} done admin_delete_mentor')
+    logging.debug(f'chat_id: {call.from_user.id} done admin_delete_mentor')
 
 
 # students
@@ -346,7 +346,7 @@ async def callback_user_add_subject(message):
             return
 
         add_mentor_sub_task = create_task(db.add_mentor_subjects(mentor_id, [subject]))
-        logging.debug(f'chat_id: {call.from_user.id} preparing ADD SUBJECT FOR')
+        logging.debug(f'chat_id: {message.from_user.id} preparing ADD SUBJECT FOR')
         await bot.send_message(message.chat.id, f'Тема <b>{subject}</b> успешно добавлена', parse_mode='html')
         await add_mentor_sub_task
-        logging.debug(f'chat_id: {call.from_user.id} done ADD SUBJECT FOR')
+        logging.debug(f'chat_id: {message.from_user.id} done ADD SUBJECT FOR')
