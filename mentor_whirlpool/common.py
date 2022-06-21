@@ -27,14 +27,14 @@ async def start(message):
         logging.warn(f'chat_id: {message.from_user.id} is mentor')
         keyboard.add(*[types.KeyboardButton(task)
                        for task in await mentor_start(message)])
+    elif await db.check_is_admin(message.from_user.id):
+        logging.warn(f'chat_id: {message.from_user.id} is admin')
+        keyboard.add(*[types.KeyboardButton(task)
+                       for task in await admin_start(message)])
     else:
         logging.warn(f'chat_id: {message.from_user.id} is student')
         keyboard.add(*[types.KeyboardButton(task)
                        for task in await generic_start(message)])
-    if await db.check_is_admin(message.from_user.id):
-        logging.warn(f'chat_id: {message.from_user.id} is admin')
-        keyboard.add(*[types.KeyboardButton(task)
-                       for task in await admin_start(message)])
     await bot.send_message(message.from_user.id,
                            'Ваши опции приведены в клавиатуре снизу:',
                            reply_markup=keyboard, parse_mode='Html')

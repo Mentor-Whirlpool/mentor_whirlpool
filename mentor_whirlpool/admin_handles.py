@@ -1,10 +1,16 @@
 from telegram import bot
-from telebot import types
+from telebot import types, asyncio_filters
+from telebot.asyncio_handler_backends import State, StatesGroup
 from database import Database
 from re import fullmatch
 from asyncio import create_task, gather
 from confirm import confirm
 import logging
+
+
+class AdminStates(StatesGroup):
+    add_subject = State()
+
 
 async def admin_start(message):
     """
@@ -21,7 +27,7 @@ async def admin_start(message):
     iterable
         Iterable with all handles texts
     """
-    return ['Менторы', 'Запросы (админ)']
+    return ['Менторы', 'Запросы (админ)', 'Добавить предмет']
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('add_mentor_via_admin_'))
@@ -38,12 +44,50 @@ async def callback_add_mentor(call):
         await db.remove_student(student_info[0]['id'])
 
 
+@bot.message_handler(func=lambda msg: msg.text == 'Добавить предмет')
+async def add_subject_admin(message):
+    """
+    If from_user.id is in admins, ask him to write name of new subject
+
+    Parameters
+    ----------
+    message : telebot.types.Message
+        A pyTelegramBotAPI Message type class
+    """
+    db = Database()
+    if not await db.check_is_admin(message.from_user.id):
+        logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
+        await bot.send_message(message.from_user.id, 'Вы не являетесь админом')
+        return
+
+    logging.debug(f'chat_id: {message.from_user.id} preparing add_subject')
+    await gather(bot.set_state(message.from_user.id, AdminStates.add_subject),
+                 bot.send_message(message.from_user.id, "Введите название предмета:"))
+    logging.debug(f'chat_id: {message.from_user.id} done add_subject')
+
+
+@bot.message_handler(state=AdminStates.add_subject)
+async def save_subject(message):
+    logging.debug(f'chat_id: {message.from_user.id} is in add_subject')
+
+    db = Database()
+    if message.text in await db.get_subjects():
+        await gather(bot.delete_state(message.from_user.id),
+                     bot.send_message(message.from_user.id, "Предмет уже добавлен."))
+        logging.warn(f'chat_id: {message.from_user.id} subject already added')
+        return
+    await gather(db.add_subject(message.text),
+                 bot.delete_state(message.from_user.id),
+                 bot.send_message(message.from_user.id, "Предмет успешно добавлен."))
+    logging.debug(f'chat_id: {message.from_user.id} subject has been added')
+
+
 @bot.message_handler(func=lambda msg: msg.text == 'Запросы (админ)')
 async def course_work(message):
     db = Database()
-    if not await db.check_is_admin(message.chat.id):
+    if not await db.check_is_admin(message.from_user.id):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
-        await bot.send_message(message.chat.id, 'Вы не являетесь админом')
+        await bot.send_message(message.from_user.id, 'Вы не являетесь админом')
         return
 
     course_works = await db.get_course_works()
@@ -52,9 +96,9 @@ async def course_work(message):
         for work in course_works:
             messages.append(f'@{(await db.get_students(work["student"]))[0]["name"]}\n{work["description"]}')
         message_course_works = '\n--------\n'.join(messages)
-        await bot.send_message(message.chat.id, message_course_works)
+        await bot.send_message(message.from_user.id, message_course_works)
     else:
-        await bot.send_message(message.chat.id, 'Нет запросов курсовых работ')
+        await bot.send_message(message.from_user.id, 'Нет запросов курсовых работ')
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Менторы')
@@ -84,7 +128,7 @@ async def list_mentors(message):
 
         if not mentor['subjects']:
             tasks.append(
-                bot.send_message(message.chat.id, f'<b>@{mentor["name"]}</b>\nНет выбранных тем', reply_markup=markup,
+                bot.send_message(message.from_user.id, f'<b>@{mentor["name"]}</b>\nНет выбранных тем', reply_markup=markup,
                                  parse_mode='html'))
             continue
 
@@ -100,8 +144,9 @@ async def list_mentors(message):
 
         message_subjects = '\n'.join(f'{k} - {v}' for k, v in subjects_count_dict.items())
 
-        tasks.append(bot.send_message(message.chat.id, f'<b>@{mentor["name"]}</b>\n{message_subjects}', reply_markup=markup,
-                                      parse_mode='html'))
+        tasks.append(
+            bot.send_message(message.from_user.id, f'<b>@{mentor["name"]}</b>\n{message_subjects}', reply_markup=markup,
+                             parse_mode='html'))
 
     logging.debug(f'chat_id: {message.from_user.id} preparing MENTORS')
     await gather(*tasks)
@@ -211,7 +256,7 @@ async def callback_user_add_subject(message):
             break
 
     if not student_chat_id:
-        await bot.send_message(message.chat.id, f'Студент {student_name} НЕ НАЙДЕН')
+        await bot.send_message(message.from_user.id, f'Студент {student_name} НЕ НАЙДЕН')
         return
 
     logging.debug(f'chat_id: {message.from_user.id} preparing ADD_STUDENT_FOR')
@@ -219,7 +264,7 @@ async def callback_user_add_subject(message):
         db.accept_work(mentor_id, await db.add_course_work(
             {'name': student_name, 'chat_id': student_chat_id, 'subjects': [subject],
              'description': course_work_name})),
-        bot.send_message(message.chat.id,
+        bot.send_message(message.from_user.id,
                          f'Студен {student_name} добавлен к ментору {(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}'),
         bot.send_message(mentor_chat_id, f'Студент @{student_name} привязан к Вам админом'),
         bot.send_message(student_chat_id,
@@ -246,7 +291,8 @@ async def callback_delete_student_info(call):
 async def callback_delete_student(call):
     db = Database()
     mentor_chat_id, work_id, student_id = call.data[18:].split('_')
-    logging.debug(f'chat_id: {call.from_user.id} getting mentor with chat_id {mentor_chat_id}, student with chat_id {student_id}')
+    logging.debug(
+        f'chat_id: {call.from_user.id} getting mentor with chat_id {mentor_chat_id}, student with chat_id {student_id}')
     student_info = (await db.get_students(id_field=student_id))[0]
     logging.debug(f'chat_id: {call.from_user.id} got student {student_info}')
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
@@ -347,6 +393,8 @@ async def callback_user_add_subject(message):
 
         add_mentor_sub_task = create_task(db.add_mentor_subjects(mentor_id, [subject]))
         logging.debug(f'chat_id: {message.from_user.id} preparing ADD SUBJECT FOR')
-        await bot.send_message(message.chat.id, f'Тема <b>{subject}</b> успешно добавлена', parse_mode='html')
+        await bot.send_message(message.from_user.id, f'Тема <b>{subject}</b> успешно добавлена', parse_mode='html')
         await add_mentor_sub_task
         logging.debug(f'chat_id: {message.from_user.id} done ADD SUBJECT FOR')
+
+bot.add_custom_filter(asyncio_filters.StateFilter(bot))

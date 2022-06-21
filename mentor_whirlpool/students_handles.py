@@ -31,8 +31,8 @@ async def generic_start(message):
     iterable
         Iterable with all handles texts
     """
-    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Хочу стать ментором',
-                'Поддержка']
+    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы',
+                'Хочу стать ментором', 'Поддержка']
     return commands
 
 
@@ -275,13 +275,13 @@ async def select_subject_callback(call):
     await bot.answer_callback_query(call.id)
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith("own_request"))
-async def add_own_subject_callback(call):
-    logging.debug(f'chat_id: {call.from_user.id} is in own_request')
-    await bot.set_state(call.from_user.id, StudentStates.add_own_subject_flag, call.message.chat.id)
-
-    await gather(bot.answer_callback_query(call.id),
-                 bot.send_message(call.from_user.id, "Введите название предмета:"))
+# @bot.callback_query_handler(func=lambda call: call.data.startswith("own_request"))
+# async def add_own_subject_callback(call):
+#     logging.debug(f'chat_id: {call.from_user.id} is in own_request')
+#     await bot.set_state(call.from_user.id, StudentStates.add_own_subject_flag, call.message.chat.id)
+#
+#     await gather(bot.answer_callback_query(call.id),
+#                  bot.send_message(call.from_user.id, "Введите название предмета:"))
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("delete_request_"))
