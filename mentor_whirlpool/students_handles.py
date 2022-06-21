@@ -46,30 +46,46 @@ async def add_request(message):
 
     id = await db.get_students(chat_id=message.chat.id)
 
-    stud_accepted = []
+    stud_accepted_subj = []
     if id:
         stud_accepted = await db.get_accepted(student=id[0]['id'])
-    markup = types.InlineKeyboardMarkup([types.InlineKeyboardButton(sub, callback_data=f'readm_{sub}')
-                                         for sub in await db.get_subjects()
-                                         if sub not in stud_accepted], row_width=1)
-    if id and stud_accepted:
-        await bot.send_message(message.from_user.id, "Вас уже обслуживает ментор\n"
-                                                     "Создаём запрос на доп. ментора!\n"
-                                                     "Выберите тему, которая вас интересует:",
-                                                     reply_markup=markup)
+        for work in stud_accepted:
+            stud_accepted_subj += work['subjects']
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    if id and stud_accepted_subj:
+        if set(await db.get_subjects()) == set(stud_accepted_subj):
+            await bot.send_message(message.from_user.id,
+                                   'Вы уже добавили все возможные темы!\n'
+                                   'Если у вас остались вопросы, обратитесь в поддержку')
+            return
+        if len(stud_accepted_subj) > 2:
+            await bot.send_message(message.from_user.id,
+                                   'Вас уже обслуживает доп. ментор!\n'
+                                   'Если у вас остались вопросы, обратитесь в поддержку')
+            return
+        markup.add(*[types.InlineKeyboardButton(sub, callback_data=f'readm_{sub}')
+                     for sub in await db.get_subjects()
+                     if sub not in stud_accepted_subj])
+        await bot.send_message(message.from_user.id,
+                               "Вас уже обслуживает ментор\n"
+                               "Создаём запрос на доп. ментора!\n"
+                               "Выберите тему, которая вас интересует:",
+                               reply_markup=markup)
         return
-
+    markup.add(*[types.InlineKeyboardButton(sub, callback_data=f'add_request_{sub}')
+                 for sub in await db.get_subjects()
+                 if sub not in stud_accepted])
     logging.debug(f'chat_id: {message.from_user.id} preparing ADD_REQUEST')
     await bot.send_message(message.chat.id, "Добавить запрос:", reply_markup=markup)
     logging.debug(f'chat_id: {message.from_user.id} done ADD_REQUEST')
 
 
-@bot.callback_query_handler(func=lambda call: call.data.startswith == 'readm_')
-async def add_request(call):
+@bot.callback_query_handler(func=lambda call: call.data.startswith('readm_'))
+async def readmission_request(call):
     db = Database()
     logging.debug(f'chat_id: {call.from_user.id} is in ADDITIONAL_MENTOR')
 
-    id = await db.get_students(chat_id=call.chat.id)
+    id = await db.get_students(chat_id=call.from_user.id)
     accepted = None
     if id:
         accepted = await db.get_accepted(student=id[0]['id'])
@@ -79,7 +95,8 @@ async def add_request(call):
         return
 
     logging.debug(f'chat_id: {call.from_user.id} preparing ADD_REQUEST')
-    await gather(db.readmission_work(accepted[0]['id'], call.data[6:]),
+    await gather(bot.answer_callback_query(call.id),
+                 db.readmission_work(accepted[0]['id'], call.data[6:]),
                  bot.send_message(call.from_user.id,
                                   'Вы успешно запросили доп. ментора!\n'
                                   'Если вы передумаете, вы можете отменить '
