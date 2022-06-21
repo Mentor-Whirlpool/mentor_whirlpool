@@ -102,7 +102,8 @@ async def callback_query_work(call):
                                   f'Напишите @{(await db.get_students(id_field=course_work_info["student"]))[0]["name"]}',
                                   parse_mode='html'),
                  bot.send_message((await db.get_students(id_field=course_work_info["student"]))[0]["chat_id"],
-                                  f'Ментор @{mentor_info["name"]} принял Ваш запрос <b>{course_work_info["description"]}</b>',
+                                  f'Ментор @{mentor_info["name"]} принял Ваш запрос <b>{course_work_info["description"]}</b>'
+                                  'Если вам будет необходимо запросить дополнительного ментора, воспользуйтесь "Добавить запрос"',
                                   parse_mode='html'))
     logging.debug(f'chat_id: {call.from_user.id} done mnt_work')
 
