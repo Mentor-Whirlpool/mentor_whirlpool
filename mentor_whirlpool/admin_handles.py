@@ -5,6 +5,9 @@ from database import Database
 from re import fullmatch
 from asyncio import create_task, gather
 from confirm import confirm
+from mentor_handles import mentor_start
+from student_handles import student_start
+from support_handles import support_start
 import logging
 
 
@@ -36,8 +39,14 @@ async def callback_add_mentor(call):
     new_mentor_info = await bot.get_chat(call.data[21:])
     student_info = await db.get_students(chat_id=call.data[21:])
     logging.info(f'chat_id: {call.data[21:]} is now a mentor')
+    mentor_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    mentor_markup.add(*[types.KeyboardButton(task)
+                        for task in await mentor_start(None)])
+    if await db.check_is_support(call.from_user.id):
+        mentor_markup.add(*[types.KeyboardButton(task)
+                             for task in await support_start(None)])
     await gather(db.add_mentor({'name': new_mentor_info.username, 'chat_id': call.data[21:], 'subjects': None}),
-                 bot.send_message(call.data[21:], 'Теперь Вы ментор!'),
+                 bot.send_message(call.data[21:], 'Теперь Вы ментор!', reply_markup=mentor_markup),
                  bot.send_message(call.from_user.id, f'@{new_mentor_info.username} стал ментором'),
                  bot.answer_callback_query(call.id))
     if student_info:
@@ -57,7 +66,6 @@ async def add_subject_admin(message):
     db = Database()
     if not await db.check_is_admin(message.from_user.id):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
-        await bot.send_message(message.from_user.id, 'Вы не являетесь админом')
         return
 
     logging.debug(f'chat_id: {message.from_user.id} preparing add_subject')
@@ -87,7 +95,6 @@ async def course_work(message):
     db = Database()
     if not await db.check_is_admin(message.from_user.id):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
-        await bot.send_message(message.from_user.id, 'Вы не являетесь админом')
         return
 
     course_works = await db.get_course_works()
@@ -115,7 +122,6 @@ async def list_mentors(message):
     db = Database()
     if not await db.check_is_admin(message.from_user.id):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
-        await bot.send_message(message.from_user.id, 'Вы не являетесь админом')
         return
 
     logging.debug(f'chat_id: {message.from_user.id} in MENTORS')
@@ -183,10 +189,16 @@ async def delete_mentor(call):
     mentor_info = (await db.get_mentors(chat_id=int(call.data[20:])))[0]
     logging.debug(f'chat_id: {call.from_user.id} chosen mentor {mentor_info}')
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_mentor')
+    student_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    student_markup.add(*[types.KeyboardButton(task)
+                         for task in await student_start(None)])
+    if await db.check_is_support(call.from_user.id):
+        student_markup.add(*[types.KeyboardButton(task)
+                             for task in await support_start(None)])
     await gather(
         db.remove_mentor(id_field=mentor_info['id']),
         bot.send_message(call.from_user.id, f'Ментор @{mentor_info["name"]} был удален'),
-        bot.send_message(mentor_info['chat_id'], 'Вы больше не являетесь ментором'),
+        bot.send_message(mentor_info['chat_id'], 'Вы больше не являетесь ментором', reply_markup=student_markup),
         bot.delete_message(call.from_user.id, call.message.id),
         bot.answer_callback_query(call.id)
     )
