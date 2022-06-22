@@ -6,7 +6,7 @@ from re import fullmatch
 from asyncio import create_task, gather
 from confirm import confirm
 from mentor_handles import mentor_start
-from student_handles import student_start
+from students_handles import generic_start
 from support_handles import support_start
 import logging
 
@@ -191,7 +191,7 @@ async def delete_mentor(call):
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_mentor')
     student_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     student_markup.add(*[types.KeyboardButton(task)
-                         for task in await student_start(None)])
+                         for task in await generic_start(None)])
     if await db.check_is_support(call.from_user.id):
         student_markup.add(*[types.KeyboardButton(task)
                              for task in await support_start(None)])
@@ -225,11 +225,9 @@ async def callback_add_student_subject_choice(call):
     mentor_subjects = (await db.get_mentors(chat_id=call.data[33:]))[0]['subjects']
 
     markup = types.InlineKeyboardMarkup()
-    markup.add(
-        *[types.InlineKeyboardButton(subject,
-                                     callback_data='admin_add_student_with_subject_' + subject + '_' + call.data[33:])
-          for
-          subject in mentor_subjects])
+    markup.add(*[types.InlineKeyboardButton(subject,
+                 callback_data='admin_add_student_with_subject_' + subject + '_' + call.data[33:])
+                 for subject in mentor_subjects])
 
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_add_student_subject_choice')
     await bot.send_message(call.from_user.id, 'Выберете тему курсовой чтобы добавить студента', reply_markup=markup)
