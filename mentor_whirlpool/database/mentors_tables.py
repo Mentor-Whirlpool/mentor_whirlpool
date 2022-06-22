@@ -79,17 +79,18 @@ class MentorsTables:
                                                     'WHERE CHAT_ID = %s',
                                                     (chat_id,))).fetchone()]
         if student is not None:
-            mentor = await (await self.db.execute('SELECT MENTOR FROM MENTORS_STUDENTS '
+            mentors = await (await self.db.execute('SELECT MENTOR FROM MENTORS_STUDENTS '
                                                   'WHERE STUDENT= %s',
-                                                  (student,))).fetchone()
-            if mentor is None:
+                                                  (student,))).fetchall()
+            if not mentors:
                 return []
             # parameter is just mentor, as it is already a tuple
             # beneficial to do so, because fetchone will return None if
             # mentor has not been found
             mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
                                                     'WHERE ID = %s',
-                                                    mentor)).fetchone()]
+                                                    (ment,))).fetchone()
+                       for (ment,) in mentors]
         if id is None and chat_id is None and student is None:
             mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
         return await self.assemble_mentors_dict(mentors)
