@@ -304,15 +304,16 @@ async def delete_finale(call):
 
     db = Database()
     student = await db.get_students(id_)
-    mentor = await db.get_mentors(student=id_)
+    mentors = await db.get_mentors(student=id_)
 
     logging.debug(f'chat_id: {call.from_user.id} preparing delete_finale')
     await gather(db.remove_student(id_), bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id,
                                   "Ваша курсовая работа успешно удалена. Но вы всегда можете начать новую!"),
-                 bot.send_message(mentor[0]['chat_id'],
-                                  f"Студент @{student[0]['name']} удалил принятую вами "
-                                  f"курсовую работу \"{student[0]['course_works'][0]['description']}\""),
+                 *[bot.send_message(ment['chat_id'],
+                                    f"Студент @{student[0]['name']} удалил принятую вами "
+                                    f"курсовую работу \"{student[0]['course_works'][0]['description']}\"")
+                   for ment in mentors],
                  bot.delete_message(call.message.chat.id, call.message.id))
     logging.debug(f'chat_id: {call.from_user.id} done delete_finale')
 
