@@ -126,6 +126,11 @@ class AcceptedTables:
         DBAccessError whatever
         DBDoesNotExist
         DBAlreadyExists
+
+        Returns
+        -------
+        int
+            Database ID of readmissioned work
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
@@ -142,6 +147,7 @@ class AcceptedTables:
             await self.db.execute('INSERT INTO COURSE_WORKS_SUBJECTS VALUES('
                                   '%s, %s)', (cw_id, subj_id))
         await self.db.commit()
+        return cw_id
 
     async def get_accepted(self, id_field=None, subjects=[], student=None):
         if self.db is None:
