@@ -175,12 +175,12 @@ async def my_requests(message):
 
     student_request = create_task(db.get_course_works(student=id[0]['id']))
     if await db.get_accepted(student=id[0]['id']):
-        mentor = await db.get_mentors(student=id[0]['id'])
-
         logging.debug(f'chat_id: {message.from_user.id} preparing MY_REQUESTS')
-        await bot.send_message(message.from_user.id,
-                               f"Текущая принятая курсовая работа: <b>{id[0]['course_works'][0]['description']}</b>\n"
-                               f"Твой ментор: <b>@{mentor[0]['name']}</b>", parse_mode="Html")
+        text = f'Текущая принятая курсовая работа: <b>{id[0]["course_works"][0]["description"]}</b><br>Твои менторы: <br><b>'
+        for ment in await db.get_mentors(student=id[0]['id']):
+            text += f"@{ment['name']}<br>"
+        text += "</b>"
+        await bot.send_message(message.from_user.id, text, parse_mode="Html")
         student_request = await student_request
         if student_request:
             await bot.send_message(message.from_user.id,
