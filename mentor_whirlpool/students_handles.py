@@ -74,7 +74,7 @@ async def add_request(message):
         return
     markup.add(*[types.InlineKeyboardButton(sub, callback_data=f'add_request_{sub}')
                  for sub in await db.get_subjects()
-                 if sub not in stud_accepted])
+                 if sub not in stud_accepted_subj])
     logging.debug(f'chat_id: {message.from_user.id} preparing ADD_REQUEST')
     await bot.send_message(message.chat.id, "Добавить запрос:", reply_markup=markup)
     logging.debug(f'chat_id: {message.from_user.id} done ADD_REQUEST')
