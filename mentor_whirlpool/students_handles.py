@@ -94,13 +94,20 @@ async def readmission_request(call):
         await bot.send_message(call.from_user.id, 'Вас ещё не курирует ментор')
         return
 
+    cw_id = await db.readmission_work(accepted[0]['id'], call.data[6:])
+    accept_markup = types.InlineKeyboardMarkup(row_width=1)
+    accept_markup.add(types.InlineKeyboardButton('Принять', callback_data=f'mnt_work_{cw_id}'))
+    mentors_to_alert = [ment['chat_id'] for ment in await db.get_mentors()
+                        if call.data[6:] in ment['subjects']]
     logging.debug(f'chat_id: {call.from_user.id} preparing ADD_REQUEST')
     await gather(bot.answer_callback_query(call.id),
-                 db.readmission_work(accepted[0]['id'], call.data[6:]),
                  bot.send_message(call.from_user.id,
                                   'Вы успешно запросили доп. ментора!\n'
                                   'Если вы передумаете, вы можете отменить '
-                                  'запрос, используя "Удалить запрос"'))
+                                  'запрос, используя "Удалить запрос"'),
+                 *[bot.send_message(ment, 'Поступил новый запрос на доп. ментора по вашей теме!',
+                                    reply_markup=accept_markup)
+                   for ment in mentors_to_alert])
     logging.debug(f'chat_id: {call.from_user.id} done ADD_REQUEST')
 
 
@@ -152,10 +159,18 @@ async def save_request(message):
                          bot.send_message(message.chat.id, "Работа с таким именем уже добавлена!"))
             return
     logging.debug(f'chat_id: {message.from_user.id} preparing add_work_flag')
-    await gather(db.add_course_work(student_dict), bot.delete_state(message.from_user.id, message.chat.id),
+    cw_id = await db.add_course_work(student_dict)
+    accept_markup = types.InlineKeyboardMarkup(row_width=1)
+    accept_markup.add(types.InlineKeyboardButton('Принять', callback_data=f'mnt_work_{cw_id}'))
+    mentors_to_alert = [ment['chat_id'] for ment in await db.get_mentors()
+                        if student_dict['subjects'][0] in ment['subjects']]
+    await gather(bot.delete_state(message.from_user.id, message.chat.id),
                  bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
-                                                   "\n\nЕсли вы захотите запросить дополнительного ментора, нажмите кнопку "
-                                                   "<b>\"Запросить доп. ментора\"</b>", parse_mode="Html"))
+                                                   "<br><br>Если вы захотите запросить дополнительного ментора, нажмите кнопку "
+                                                   "<b>\"Запросить доп. ментора\"</b>", parse_mode="Html"),
+                 *[bot.send_message(ment, 'Поступил новый запрос на доп. ментора по вашей теме!',
+                                    reply_markup=accept_markup)
+                   for ment in mentors_to_alert])
     logging.debug(f'chat_id: {message.from_user.id} done add_work_flag')
 
 
