@@ -83,11 +83,12 @@ async def works(message):
                 logging.debug(f'removed work from list: {work}')
             except ValueError:
                 continue
+    logging.debug('finished removing works')
 
     markup = types.InlineKeyboardMarkup()
 
     for work in course_works:
-        if await db.get_accepted(student=work['student']['id']):
+        if await db.get_accepted(student=work['student']):
             markup.add(
                 types.InlineKeyboardButton(
                     f'@{(await db.get_students(work["student"]))[0]["name"]} - {work["subjects"][0]} - {work["description"]} (доп. запрос)',
