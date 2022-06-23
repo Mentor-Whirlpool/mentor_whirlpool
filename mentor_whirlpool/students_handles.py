@@ -310,7 +310,7 @@ async def select_subject_callback(call):
     logging.debug(f'chat_id: {call.from_user.id} is in add_request')
     await bot.send_message(call.from_user.id, f"<b>Тема: {call.data[12:]}</b>\n\n"
                                               f"Введи название работы. \n\n<b>Если не знаешь, на какую тему будешь писать работу, "
-                                              f"просто напиши \"Я не знаю\":</b>", parse_mode='Html')
+                                              f"просто напиши \"Открыт к предложениям\":</b>", parse_mode='Html')
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
