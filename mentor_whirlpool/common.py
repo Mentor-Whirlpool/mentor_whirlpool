@@ -61,4 +61,4 @@ async def help(message):
     else:
         logging.warn(f'chat_id: {message.from_user.id} is student and requested help')
         await bot.send_message(message.from_user.id,
-                               await student_help, parse_mode='html')
+                               await student_help(), parse_mode='html')
