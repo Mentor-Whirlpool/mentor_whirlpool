@@ -116,7 +116,7 @@ async def readmission_request(call):
         accepted = await db.get_accepted(student=id[0]['id'])
     # should be possible if button is clicked after student decides to nuke himself
     if not accepted:
-        await bot.send_message(call.from_user.id, 'Вас ещё не курирует ментор')
+        await bot.send_message(call.from_user.id, 'Тебя ещё не курирует ментор')
         return
 
     cw_id = await db.readmission_work(accepted[0]['id'], call.data[6:])
@@ -130,7 +130,8 @@ async def readmission_request(call):
                                   'Ты успешно запросил доп. ментора!\n'
                                   'Если передумаешь, можно отменить '
                                   'запрос, используя "Удалить запрос"'),
-                 *[bot.send_message(ment['chat_id'], 'Поступил новый запрос на доп. ментора по вашей теме!',
+                 *[bot.send_message(ment['chat_id'], f'Поступил новый запрос на доп. ментора по вашему направлению: {call.data[6:]}!\n'
+                                                     f'С темой: {accepted[0]["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert
                    if ment not in await db.get_mentors(student=id[0]['id'])])
@@ -195,7 +196,8 @@ async def save_request(message):
                  bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
                                                    "\nЕсли вы захотите запросить дополнительного ментора, нажми кнопку "
                                                    "<b>\"Добавить запрос\"</b>", parse_mode="Html"),
-                 *[bot.send_message(ment, 'Поступил новый запрос по вашей теме!',
+                 *[bot.send_message(ment, f'Поступил новый запрос по вашему направлению: {student_dict["subjects"][0]}!\n'
+                                          f'С темой: {student_dict["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert])
     logging.debug(f'chat_id: {message.from_user.id} done add_work_flag')
