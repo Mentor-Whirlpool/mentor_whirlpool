@@ -65,9 +65,9 @@ async def student_help():
 async def add_request(message):
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} is in ADD_REQUEST')
-    if await db.check_is_mentor(message.from_user.id):
-        logging.warn(f'chat_id: {message.from_user.id} is a mentor')
-        return
+    # if await db.check_is_mentor(message.from_user.id) :
+    #     logging.warn(f'chat_id: {message.from_user.id} is a mentor')
+    #     return
 
     id = await db.get_students(chat_id=message.chat.id)
 
@@ -131,7 +131,7 @@ async def readmission_request(call):
                                   'Если передумаешь, можно отменить '
                                   'запрос, используя "Удалить запрос"'),
                  *[bot.send_message(ment['chat_id'], f'Поступил новый запрос на доп. ментора по вашему направлению: {call.data[6:]}!\n'
-                                                     f'С темой: {accepted[0]["description"]}',
+                                                     f'Тема: {accepted[0]["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert
                    if ment not in await db.get_mentors(student=id[0]['id'])])
@@ -197,7 +197,7 @@ async def save_request(message):
                                                    "\nЕсли вы захотите запросить дополнительного ментора, нажми кнопку "
                                                    "<b>\"Добавить запрос\"</b>", parse_mode="Html"),
                  *[bot.send_message(ment, f'Поступил новый запрос по вашему направлению: {student_dict["subjects"][0]}!\n'
-                                          f'С темой: {student_dict["description"]}',
+                                          f'Тема: {student_dict["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert])
     logging.debug(f'chat_id: {message.from_user.id} done add_work_flag')
@@ -207,9 +207,9 @@ async def save_request(message):
 async def my_requests(message):
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} is in MY_REQUESTS')
-    if await db.check_is_mentor(message.from_user.id):
-        logging.warn(f'chat_id: {message.from_user.id} is a mentor')
-        return
+    # if await db.check_is_mentor(message.from_user.id):
+        # logging.warn(f'chat_id: {message.from_user.id} is a mentor')
+        # return
     id = await db.get_students(chat_id=message.chat.id)
     logging.debug(f'chat_id: {message.from_user.id} info {id}')
 
@@ -245,9 +245,9 @@ async def my_requests(message):
 async def remove_request(message):
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} is in REMOVE_REQUEST')
-    if await db.check_is_mentor(message.from_user.id):
-        logging.warn(f'chat_id: {message.from_user.id} is a mentor')
-        return
+    # if await db.check_is_mentor(message.from_user.id):
+        # logging.warn(f'chat_id: {message.from_user.id} is a mentor')
+        # return
     id = await db.get_students(chat_id=message.chat.id)
 
     if not id:
@@ -288,9 +288,9 @@ async def remove_request(message):
 async def mentor_resume(message):
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} is in BECOME_MENTOR_REQUEST')
-    if await db.check_is_mentor(message.from_user.id):
-        logging.warn(f'chat_id: {message.from_user.id} is a mentor')
-        return
+    # if await db.check_is_mentor(message.from_user.id):
+        # logging.warn(f'chat_id: {message.from_user.id} is a mentor')
+        # return
     admins = await db.get_admins()
 
     markup = types.InlineKeyboardMarkup()
