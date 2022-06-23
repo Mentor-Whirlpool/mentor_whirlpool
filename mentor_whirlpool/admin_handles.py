@@ -30,7 +30,7 @@ async def admin_start(message):
     iterable
         Iterable with all handles texts
     """
-    return ['Менторы', 'Запросы (админ)', 'Добавить направление'] # , 'Удалить направление']
+    return ['Менторы', 'Запросы (админ)', 'Добавить направление', 'Удалить направление']
 
 
 async def admin_help():
@@ -98,7 +98,6 @@ async def remove_subject_admin(message):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
         return
 
-    
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(*[types.InlineKeyboardButton(subj, callback_data=f'adm_rem_subj_{subj}')
                  for subj in await db.get_subjects()])
@@ -128,9 +127,10 @@ async def remove_subject(call):
     logging.debug(f'chat_id: {call.from_user.id} is in remove_subject')
 
     db = Database()
-    await gather(db.remove_subject(call.text),
+    await gather(db.remove_subject(call.data[13:]),
                  bot.send_message(call.from_user.id, "Предмет успешно удалён."))
     logging.debug(f'chat_id: {call.from_user.id} subject has been removed')
+
 
 @bot.message_handler(func=lambda msg: msg.text == 'Запросы (админ)')
 async def course_work(message):
