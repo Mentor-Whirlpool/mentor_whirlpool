@@ -30,7 +30,7 @@ async def admin_start(message):
     iterable
         Iterable with all handles texts
     """
-    return ['Менторы', 'Запросы (админ)', 'Добавить направление', 'Удалить направление']
+    return ['Менторы', 'Запросы (админ)', 'Редактировать направления']
 
 
 async def admin_help():
@@ -62,10 +62,27 @@ async def callback_add_mentor(call):
         await db.remove_student(student_info[0]['id'])
 
 
-@bot.message_handler(func=lambda msg: msg.text == 'Добавить направление')
-async def add_subject_admin(message):
+@bot.callback_query_handler(func=lambda call: call.data == 'adm_add_subj')
+async def add_subject_admin(call):
     """
     If from_user.id is in admins, ask him to write name of new subject
+
+    Parameters
+    ----------
+    message : telebot.types.Message
+        A pyTelegramBotAPI Message type class
+    """
+    logging.debug(f'chat_id: {call.from_user.id} preparing add_subject')
+    await gather(bot.set_state(call.from_user.id, AdminStates.add_subject),
+                 bot.send_message(call.from_user.id, "Введите название направления:"))
+    logging.debug(f'chat_id: {call.from_user.id} done add_subject')
+
+
+@bot.message_handler(func=lambda msg: msg.text == 'Редактировать направления')
+async def edit_subjects(message):
+    """
+    Prints a list of all subjects as inline buttons with subjects and a button
+    for addition of subject
 
     Parameters
     ----------
@@ -76,34 +93,12 @@ async def add_subject_admin(message):
     if not await db.check_is_admin(message.from_user.id):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
         return
-
-    logging.debug(f'chat_id: {message.from_user.id} preparing add_subject')
-    await gather(bot.set_state(message.from_user.id, AdminStates.add_subject),
-                 bot.send_message(message.from_user.id, "Введите название направления:"))
-    logging.debug(f'chat_id: {message.from_user.id} done add_subject')
-
-
-@bot.message_handler(func=lambda msg: msg.text == 'Удалить направление')
-async def remove_subject_admin(message):
-    """
-    If from_user.id is in admins, ask him to write name of new subject
-
-    Parameters
-    ----------
-    message : telebot.types.Message
-        A pyTelegramBotAPI Message type class
-    """
-    db = Database()
-    if not await db.check_is_admin(message.from_user.id):
-        logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
-        return
-
     markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(*[types.InlineKeyboardButton(subj, callback_data=f'adm_rem_subj_{subj}')
+    markup.add(*[types.InlineKeyboardButton(f'Удалить: {subj}', callback_data=f'adm_rem_subj_{subj}')
                  for subj in await db.get_subjects()])
-    logging.debug(f'chat_id: {message.from_user.id} preparing add_subject')
-    await gather(bot.send_message(message.from_user.id, "Выберите направление для удаления:", reply_markup=markup))
-    logging.debug(f'chat_id: {message.from_user.id} done add_subject')
+    markup.add(types.InlineKeyboardButton('Добавить направление',
+                                          callback_data='adm_add_subj'))
+    await bot.send_message(message.from_user.id, 'Что сделать?', reply_markup=markup)
 
 
 @bot.message_handler(state=AdminStates.add_subject)
