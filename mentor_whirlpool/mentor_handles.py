@@ -54,6 +54,8 @@ async def works(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
+    await bot.delete_message(message.chat.id, message.id)
+
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} in REQUESTS')
     if not await db.check_is_mentor(message.from_user.id):
@@ -112,6 +114,7 @@ async def callback_query_work(call):
     logging.debug(f'chat_id: {call.from_user.id} preparing mnt_work')
     await gather(db.accept_work(mentor_info['id'], call.data[9:]),
                  bot.answer_callback_query(call.id),
+                 bot.delete_message(call.from_user.id, call.message.id),
                  bot.send_message(call.from_user.id,
                                   f'Вы взялись за <b>{course_work_info["description"]}</b>\n'
                                   f'Напишите @{(await db.get_students(id_field=course_work_info["student"]))[0]["name"]}',
@@ -139,6 +142,8 @@ async def my_subjects(message):
     message : telebot.types.Message
         A pyTelegramBotAPI Message type class
     """
+    await bot.delete_message(message.chat.id, message.id)
+
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} in MY_SUBJECTS')
     if not await db.check_is_mentor(message.from_user.id):
@@ -175,6 +180,7 @@ async def callback_show_course_works_by_subject(call):
                                      callback_data='work_' + str(work['id'])) for work in
           await db.get_course_works([call.data[8:]])])  # добавление курсачей будет в callback_query_work
     await bot.answer_callback_query(call.id)
+    await bot.delete_message(call.from_user.id, call.message.id)
     await bot.send_message(call.from_user.id, f'Курсовые работы по направлению *{call.data[8:]}*', reply_markup=markup,
                            parse_mode='html')
 
@@ -200,6 +206,7 @@ async def callback_show_subjects_to_add(call):
     else:
         await bot.send_message(call.from_user.id, '<b>Вы добавили все доступные направления</b>',
                                parse_mode='html')
+    await bot.delete_message(call.from_user.id, call.message.id)
     await answ_task
 
 
@@ -221,6 +228,7 @@ async def callback_add_subject(call):
         await bot.send_message(call.from_user.id,
                                f'Направление <b>{call.data[12:]}</b> уже была добавлено',
                                parse_mode='html')
+    await bot.delete_message(call.from_user.id, call.message.id)
     await answ_task
 
 
@@ -236,6 +244,7 @@ async def callback_show_subjects_to_delete(call):
           for subject in my_subjects_])
     logging.debug(f'chat_id: {call.from_user.id} preparing mnt_sub_to_delete')
     await gather(bot.answer_callback_query(call.id),
+                 bot.delete_message(call.from_user.id, call.message.id),
                  bot.send_message(call.from_user.id,
                                   '<b>Удалить направление</b>',
                                   reply_markup=markup,
@@ -260,6 +269,8 @@ async def callback_del_subject(call):
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои студенты')
 async def my_students(message):
+    await bot.delete_message(message.chat.id, message.id)
+
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} in MY_STUDENTS')
     if not await db.check_is_mentor(message.from_user.id):
