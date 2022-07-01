@@ -4,6 +4,7 @@ from telebot.asyncio_handler_backends import State, StatesGroup
 from mentor_whirlpool.database import Database
 from re import fullmatch
 from asyncio import create_task, gather
+from mentor_whirlpool.common import start
 from mentor_whirlpool.confirm import confirm
 from mentor_whirlpool.mentor_handles import mentor_start
 from mentor_whirlpool.students_handles import generic_start
@@ -30,7 +31,7 @@ async def admin_start(message):
     iterable
         Iterable with all handles texts
     """
-    return ['Менторы', 'Запросы (админ)', 'Редактировать направления']
+    return ['Менторы', 'Запросы (админ)', 'Редактировать поддержку', 'Редактировать направления']
 
 
 async def admin_help():
@@ -465,5 +466,43 @@ async def callback_user_add_subject(message):
         await add_mentor_sub_task
         logging.debug(f'chat_id: {message.from_user.id} done ADD SUBJECT FOR')
 
+
+@bot.message_handler(func=lambda msg: msg.text == 'Редактировать поддержку')
+async def edit_subjects(message):
+    """
+    Prints a list of all suppoerts as inline buttons and a button
+    for addition of support
+
+    Parameters
+    ----------
+    message : telebot.types.Message
+        A pyTelegramBotAPI Message type class
+    """
+    db = Database()
+    if not await db.check_is_admin(message.from_user.id):
+        logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
+        return
+    markup = types.InlineKeyboardMarkup(row_width=1)
+    markup.add(*[types.InlineKeyboardButton(f'Удалить: {supp["name"]}', callback_data=f'adm_rem_supp_{supp["id"]}')
+                 for supp in await db.get_supports()])
+    markup.add(types.InlineKeyboardButton('Добавить саппорта',
+                                          callback_data='adm_add_supp'))
+    await bot.send_message(message.from_user.id, 'Что сделать?', reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('adm_rem_supp_'))
+async def callback_delete_subject(call):
+    db = Database()
+    supp_id = int(call.data[13:])
+    supp = await db.get_supports(supp_id)
+    logging.debug(f'chat_id: {call.from_user.id} preparing adm_rem_supp')
+    await gather(
+        db.remove_support(supp_id),
+        bot.send_message(supp['chat_id'], f'Вы больше не часть поддержки!'),
+        start(call),
+        bot.send_message(call.from_user.id,
+                         f'Саппорт {supp["name"]} удалён'),
+        bot.answer_callback_query(call.id))
+    logging.debug(f'chat_id: {call.from_user.id} done adm_rem_supp')
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))
