@@ -539,5 +539,8 @@ async def add_support_chat_id_handler(message):
                  bot.delete_state(message.from_user.id),
                  bot.send_message(message.from_user.id, 'Саппорт успешно добавлен'),
                  bot.send_message(supp_chat_id, 'Теперь вы член группы поддержки!', reply_markup=markup))
+    stud = await db.get_students(chat_id=supp_chat_id)
+    if stud:
+        await db.remove_student(stud[0]['id'])
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))
