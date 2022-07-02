@@ -4,7 +4,6 @@ from telebot.asyncio_handler_backends import State, StatesGroup
 from mentor_whirlpool.database import Database
 from re import fullmatch
 from asyncio import create_task, gather
-from mentor_whirlpool.common import start
 from mentor_whirlpool.confirm import confirm
 from mentor_whirlpool.mentor_handles import mentor_start
 from mentor_whirlpool.students_handles import generic_start
@@ -497,10 +496,12 @@ async def callback_delete_subject(call):
     supp_id = int(call.data[13:])
     supp = await db.get_supports(supp_id)
     logging.debug(f'chat_id: {call.from_user.id} preparing adm_rem_supp')
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(*[types.KeyboardButton(task)
+                 for task in await generic_start(None)])
     await gather(
         db.remove_support(supp_id),
-        bot.send_message(supp['chat_id'], f'Вы больше не часть поддержки!'),
-        start(call),
+        bot.send_message(supp['chat_id'], f'Вы больше не часть поддержки!', reply_markup=markup),
         bot.send_message(call.from_user.id,
                          f'Саппорт {supp["name"]} удалён'),
         bot.answer_callback_query(call.id))
@@ -510,6 +511,7 @@ async def callback_delete_subject(call):
 @bot.callback_query_handler(func=lambda call: call.data == 'adm_add_supp')
 async def callback_add_support(call):
     await gather(bot.set_state(call.from_user.id, AdminStates.add_support),
+                 bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id,
                                   'Введите chat_id нового саппорта\nПолучить chat_id возможно у @RawDataBot'))
 
@@ -523,9 +525,11 @@ async def add_support_chat_id_handler(message):
         'chat_id': supp_chat_id,
         'name': supp.username,
     }
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    markup.add(*[types.KeyboardButton(task)
+                 for task in await support_start(None)])
     await gather(db.add_support(supp_dict),
                  bot.send_message(message.from_user.id, 'Саппорт успешно добавлен'),
-                 bot.send_message(supp_chat_id, 'Теперь вы член группы поддержки!'),
-                 start(message))
+                 bot.send_message(supp_chat_id, 'Теперь вы член группы поддержки!', reply_markup=markup))
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))
