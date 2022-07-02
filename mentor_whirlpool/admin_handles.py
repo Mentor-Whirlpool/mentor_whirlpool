@@ -501,9 +501,9 @@ async def callback_delete_subject(call):
                  for task in await generic_start(None)])
     await gather(
         db.remove_support(supp_id),
-        bot.send_message(supp['chat_id'], f'Вы больше не часть поддержки!', reply_markup=markup),
+        bot.send_message(supp[0]['chat_id'], f'Вы больше не часть поддержки!', reply_markup=markup),
         bot.send_message(call.from_user.id,
-                         f'Саппорт {supp["name"]} удалён'),
+                         f'Саппорт {supp[0]["name"]} удалён'),
         bot.answer_callback_query(call.id))
     logging.debug(f'chat_id: {call.from_user.id} done adm_rem_supp')
 
@@ -520,7 +520,14 @@ async def callback_add_support(call):
 async def add_support_chat_id_handler(message):
     db = Database()
     supp_chat_id = message.text
-    supp = await bot.get_chat(supp_chat_id)
+    try:
+        supp = await bot.get_chat(supp_chat_id)
+    except:
+        await gather(bot.send_message(message.from_user.id,
+                                      'Пользователь не найден!\n'
+                                      'Убедитесь что вы ввели chat_id верно, и пользователь начал взаимодействие с ботом'),
+                     bot.delete_state(message.from_user.id))
+        return
     supp_dict = {
         'chat_id': supp_chat_id,
         'name': supp.username,
@@ -529,6 +536,7 @@ async def add_support_chat_id_handler(message):
     markup.add(*[types.KeyboardButton(task)
                  for task in await support_start(None)])
     await gather(db.add_support(supp_dict),
+                 bot.delete_state(message.from_user.id),
                  bot.send_message(message.from_user.id, 'Саппорт успешно добавлен'),
                  bot.send_message(supp_chat_id, 'Теперь вы член группы поддержки!', reply_markup=markup))
 
