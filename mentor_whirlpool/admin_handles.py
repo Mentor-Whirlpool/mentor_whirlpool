@@ -14,6 +14,7 @@ import logging
 
 class AdminStates(StatesGroup):
     add_subject = State()
+    add_support = State()
 
 
 async def admin_start(message):
@@ -504,5 +505,27 @@ async def callback_delete_subject(call):
                          f'Саппорт {supp["name"]} удалён'),
         bot.answer_callback_query(call.id))
     logging.debug(f'chat_id: {call.from_user.id} done adm_rem_supp')
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'adm_add_supp')
+async def callback_add_support(call):
+    await gather(bot.set_state(call.from_user.id, AdminStates.add_support),
+                 bot.send_message(call.from_user.id,
+                                  'Введите chat_id нового саппорта\nПолучить chat_id возможно у @RawDataBot'))
+
+
+@bot.message_handler(state=AdminStates.add_support)
+async def add_support_chat_id_handler(message):
+    db = Database()
+    supp_chat_id = message.text
+    supp = await bot.get_chat(supp_chat_id)
+    supp_dict = {
+        'chat_id': supp_chat_id,
+        'name': supp.username,
+    }
+    await gather(db.add_support(supp_dict),
+                 bot.send_message(message.from_user.id, 'Саппорт успешно добавлен'),
+                 bot.send_message(supp_chat_id, 'Теперь вы член группы поддержки!'),
+                 start(message))
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))
