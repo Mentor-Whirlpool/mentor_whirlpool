@@ -13,27 +13,25 @@ from mentor_whirlpool.support_handles import support_start
 @bot.message_handler(commands=['start'])
 async def start(message):
     help_task = create_task(help(message))
+    someone = False
     keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
     db = Database()
     if await db.check_is_support(message.from_user.id):
         logging.warn(f'chat_id: {message.from_user.id} is support')
-
         keyboard.add(*[types.KeyboardButton(task)
                        for task in await support_start(message)])
-        await bot.send_message(message.chat.id,
-                               'Ваши опции приведены в клавиатуре снизу:',
-                               reply_markup=keyboard, parse_mode='Html')
-        return
-
+        someone = True
     if await db.check_is_mentor(message.from_user.id):
         logging.warn(f'chat_id: {message.from_user.id} is mentor')
         keyboard.add(*[types.KeyboardButton(task)
                        for task in await mentor_start(message)])
-    elif await db.check_is_admin(message.from_user.id):
+        someone = True
+    if await db.check_is_admin(message.from_user.id):
         logging.warn(f'chat_id: {message.from_user.id} is admin')
         keyboard.add(*[types.KeyboardButton(task)
                        for task in await admin_start(message)])
-    else:
+        someone = True
+    if not someone:
         logging.warn(f'chat_id: {message.from_user.id} is student')
         keyboard.add(*[types.KeyboardButton(task)
                        for task in await generic_start(message)])
