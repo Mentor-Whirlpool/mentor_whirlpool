@@ -25,18 +25,18 @@ async def mentor_start(message):
 
 
 async def mentor_help():
-    return 'Привет! Я здесь для того, чтобы помочь тебе поддерживать связь со '\
-           'студентами, нуждающимися в твоих советах. Прочитай это сообщение '\
-           'внимательно, ведь это важно! Мой функционал:\n\n'\
-           '- Каждый раз, когда студент добавляет запрос по твоему направлению, тебе '\
-           'будет приходить сообщение.\n'\
-           '- Кнопка «Запросы» вернет список «висящих» запросов от студентов.\n'\
-           '- Нажимая на кнопку «Мои направления», ты можешь увидеть список направлений, по '\
-           'которым ты ведешь менторство. Там же ты можешь удалить или добавить '\
-           'направление. Если ты хочешь добавить направление, которого нет в списке '\
-           'доступных, напиши в поддержку.\n'\
-           '- «Мои студенты» вернет тебе список твоих студентов с названием их работ.\n'\
-           '- Кнопка «Поддержка» нужна для связи со службой поддержки. Обращайся, если '\
+    return 'Привет! Я здесь для того, чтобы помочь тебе поддерживать связь со ' \
+           'студентами, нуждающимися в твоих советах. Прочитай это сообщение ' \
+           'внимательно, ведь это важно! Мой функционал:\n\n' \
+           '- Каждый раз, когда студент добавляет запрос по твоему направлению, тебе ' \
+           'будет приходить сообщение.\n' \
+           '- Кнопка «Запросы» вернет список «висящих» запросов от студентов.\n' \
+           '- Нажимая на кнопку «Мои направления», ты можешь увидеть список направлений, по ' \
+           'которым ты ведешь менторство. Там же ты можешь удалить или добавить ' \
+           'направление. Если ты хочешь добавить направление, которого нет в списке ' \
+           'доступных, напиши в поддержку.\n' \
+           '- «Мои студенты» вернет тебе список твоих студентов с названием их работ.\n' \
+           '- Кнопка «Поддержка» нужна для связи со службой поддержки. Обращайся, если ' \
            'у тебя возникли вопросы по функционалу, темам, направлениям или студентам.'
 
 
@@ -179,10 +179,11 @@ async def callback_show_course_works_by_subject(call):
         *[types.InlineKeyboardButton(f'{work["student"]} {work["description"]}',
                                      callback_data='work_' + str(work['id'])) for work in
           await db.get_course_works([call.data[8:]])])  # добавление курсачей будет в callback_query_work
-    await bot.answer_callback_query(call.id)
-    await bot.delete_message(call.from_user.id, call.message.id)
-    await bot.send_message(call.from_user.id, f'Курсовые работы по направлению *{call.data[8:]}*', reply_markup=markup,
-                           parse_mode='html')
+    await gather(bot.answer_callback_query(call.id),
+                 bot.delete_message(call.from_user.id, call.message.id),
+                 bot.send_message(call.from_user.id, f'Курсовые работы по направлению *{call.data[8:]}*',
+                                  reply_markup=markup,
+                                  parse_mode='html'))
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'mnt_sub_to_add')
@@ -285,7 +286,8 @@ async def my_students(message):
         str_my_students_ = 'У Вас нет студентов!'
     else:
         str_my_students_ = '\n'.join(
-            '@' + student['name'] + ' - ' + student['course_works'][0]['subjects'][0] + ' - ' + student["course_works"][0]["description"]
+            '@' + student['name'] + ' - ' + student['course_works'][0]['subjects'][0] + ' - ' +
+            student["course_works"][0]["description"]
             for student in my_students_)
     logging.debug(f'chat_id: {message.from_user.id} preparing MY_STUDENTS')
     await bot.send_message(message.chat.id,
