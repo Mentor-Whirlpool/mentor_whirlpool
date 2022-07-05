@@ -37,27 +37,27 @@ async def generic_start(message):
 
 
 async def student_help():
-    return 'Привет! Я здесь для того, чтобы помочь тебе найти ментора, если тебе нужна '\
-           'помощь с твоей курсовой. Прочитай это сообщение внимательно, ведь это важно! '\
-           'Мой функционал:\n'\
-           '- Кнопка «Добавить запрос» позволяет запросить ментора. При нажатии она '\
-           'вернет список направлений, по которым ведется менторство. Если подходящего '\
-           'направления там нет, обращайся в поддержку, мы поможем! Если же ты нашел '\
-           'свое направление, выбирай его и пиши свою тему. Если ты еще не определился, '\
-           'какую именно курсовую хочешь написать, то можешь отправить несколько '\
-           'запросов, однако, как только один из них примет ментор, остальные '\
-           'аннулируются.\n\n'\
-           'Также эта кнопка позволит тебе добавить дополнительный запрос после '\
-           'принятия твоей курсовой ментором в том случае, если у работы несколько '\
-           'направлений.\n'\
-           '- Кнопка «Удалить запрос» вернет тебе список с твоими запросами, нажав на '\
-           'которые, ты можешь их удалить. Если же ты уже работаешь с ментором, то эта '\
-           'кнопка предложить удалить твою курсовую: это нужно для завершения работы '\
-           'после окончания курсовой.\n'\
-           '- Кнопка «Мои запросы» вернет список твоих текущих запросов.\n'\
-           '- При нажатии на «Хочу стать ментором», сообщение отправится '\
-           'администратору, после чего с тобой свяжутся.\n'\
-           '- Кнопка «Поддержка» нужна для связи со службой поддержки. Обращайся, если '\
+    return 'Привет! Я здесь для того, чтобы помочь тебе найти ментора, если тебе нужна ' \
+           'помощь с твоей курсовой. Прочитай это сообщение внимательно, ведь это важно! ' \
+           'Мой функционал:\n' \
+           '- Кнопка «Добавить запрос» позволяет запросить ментора. При нажатии она ' \
+           'вернет список направлений, по которым ведется менторство. Если подходящего ' \
+           'направления там нет, обращайся в поддержку, мы поможем! Если же ты нашел ' \
+           'свое направление, выбирай его и пиши свою тему. Если ты еще не определился, ' \
+           'какую именно курсовую хочешь написать, то можешь отправить несколько ' \
+           'запросов, однако, как только один из них примет ментор, остальные ' \
+           'аннулируются.\n\n' \
+           'Также эта кнопка позволит тебе добавить дополнительный запрос после ' \
+           'принятия твоей курсовой ментором в том случае, если у работы несколько ' \
+           'направлений.\n' \
+           '- Кнопка «Удалить запрос» вернет тебе список с твоими запросами, нажав на ' \
+           'которые, ты можешь их удалить. Если же ты уже работаешь с ментором, то эта ' \
+           'кнопка предложить удалить твою курсовую: это нужно для завершения работы ' \
+           'после окончания курсовой.\n' \
+           '- Кнопка «Мои запросы» вернет список твоих текущих запросов.\n' \
+           '- При нажатии на «Хочу стать ментором», сообщение отправится ' \
+           'администратору, после чего с тобой свяжутся.\n' \
+           '- Кнопка «Поддержка» нужна для связи со службой поддержки. Обращайся, если ' \
            'у тебя возникли вопросы по функционалу, темам, направлениям или менторам.'
 
 
@@ -65,7 +65,7 @@ async def student_help():
 async def add_request(message):
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} is in ADD_REQUEST')
-    if await db.check_is_mentor(message.from_user.id) :
+    if await db.check_is_mentor(message.from_user.id):
         logging.warn(f'chat_id: {message.from_user.id} is a mentor')
         return
 
@@ -102,6 +102,7 @@ async def add_request(message):
                  if sub not in stud_accepted_subj])
     logging.debug(f'chat_id: {message.from_user.id} preparing ADD_REQUEST')
     await bot.send_message(message.chat.id, "Добавить запрос:", reply_markup=markup)
+    await bot.delete_message(message.chat.id, message.id)
     logging.debug(f'chat_id: {message.from_user.id} done ADD_REQUEST')
 
 
@@ -130,8 +131,9 @@ async def readmission_request(call):
                                   'Ты успешно запросил доп. ментора!\n'
                                   'Если передумаешь, можно отменить '
                                   'запрос, используя "Удалить запрос"'),
-                 *[bot.send_message(ment['chat_id'], f'Поступил новый запрос на доп. ментора по вашему направлению: {call.data[6:]} от @{call.from_user.username}]!\n'
-                                                     f'Тема: {accepted[0]["description"]}',
+                 *[bot.send_message(ment['chat_id'],
+                                    f'Поступил новый запрос на доп. ментора по вашему направлению: {call.data[6:]} от @{call.from_user.username}]!\n'
+                                    f'Тема: {accepted[0]["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert
                    if ment not in await db.get_mentors(student=id[0]['id'])])
@@ -196,8 +198,9 @@ async def save_request(message):
                  bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
                                                    "\nЕсли вы захотите запросить дополнительного ментора, нажми кнопку "
                                                    "<b>\"Добавить запрос\"</b>", parse_mode="Html"),
-                 *[bot.send_message(ment, f'Поступил новый запрос по вашему направлению: {student_dict["subjects"][0]} от @{student_dict["name"]}!\n'
-                                          f'Тема: {student_dict["description"]}',
+                 *[bot.send_message(ment,
+                                    f'Поступил новый запрос по вашему направлению: {student_dict["subjects"][0]} от @{student_dict["name"]}!\n'
+                                    f'Тема: {student_dict["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert])
     logging.debug(f'chat_id: {message.from_user.id} done add_work_flag')
@@ -205,11 +208,12 @@ async def save_request(message):
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои запросы')
 async def my_requests(message):
+    bot.delete_message(message.chat.id, message.id)
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} is in MY_REQUESTS')
     if await db.check_is_mentor(message.from_user.id):
-       logging.warn(f'chat_id: {message.from_user.id} is a mentor')
-       return
+        logging.warn(f'chat_id: {message.from_user.id} is a mentor')
+        return
     id = await db.get_students(chat_id=message.chat.id)
     logging.debug(f'chat_id: {message.from_user.id} info {id}')
 
@@ -243,6 +247,7 @@ async def my_requests(message):
 
 @bot.message_handler(func=lambda msg: msg.text == 'Удалить запрос')
 async def remove_request(message):
+    await bot.delete_message(message.chat.id, message.id)
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} is in REMOVE_REQUEST')
     if await db.check_is_mentor(message.from_user.id):
@@ -259,7 +264,8 @@ async def remove_request(message):
     if await db.get_accepted(student=id[0]['id']):
         student_request = await student_request
         if student_request:
-            markup.add(types.InlineKeyboardButton('Запрос на доп. ментора', callback_data=f"delete_request_{student_request[0]['id']}"))
+            markup.add(types.InlineKeyboardButton('Запрос на доп. ментора',
+                                                  callback_data=f"delete_request_{student_request[0]['id']}"))
             markup.add(types.InlineKeyboardButton(f"Курсовая работа \"{id[0]['course_works'][0]['description']}\"",
                                                   callback_data=f"delete_finale_{id[0]['id']}"))
             await bot.send_message(message.from_user.id, 'Что удалить?', reply_markup=markup)
@@ -286,6 +292,7 @@ async def remove_request(message):
 
 @bot.message_handler(func=lambda msg: msg.text == 'Хочу стать ментором')
 async def mentor_resume(message):
+    await bot.delete_message(message.chat.id, message.id)
     db = Database()
     logging.debug(f'chat_id: {message.from_user.id} is in BECOME_MENTOR_REQUEST')
     if await db.check_is_mentor(message.from_user.id):
