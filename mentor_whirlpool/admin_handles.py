@@ -504,6 +504,7 @@ async def callback_delete_subject(call):
         bot.send_message(supp[0]['chat_id'], f'Вы больше не часть поддержки!', reply_markup=markup),
         bot.send_message(call.from_user.id,
                          f'Саппорт {supp[0]["name"]} удалён'),
+        bot.delete_message(call.from_user.id, call.message.id),
         bot.answer_callback_query(call.id))
     logging.debug(f'chat_id: {call.from_user.id} done adm_rem_supp')
 
