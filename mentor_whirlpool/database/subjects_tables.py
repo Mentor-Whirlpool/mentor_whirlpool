@@ -32,14 +32,14 @@ class SubjectsTables:
         await self.db.commit()
         return id_f
 
-    async def remove_subject(self, subject):
+    async def remove_subject(self, subj_id):
         """
         Removes a line from SUBJECTS table and wherever it is situated
 
         Parameters
         ----------
-        subject : str
-            string of subject
+        subj_id : integer
+            Database ID of subject
 
         Raises
         ------
@@ -48,9 +48,6 @@ class SubjectsTables:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        (subj_id,) = await (await self.db.execute('SELECT ID FROM SUBJECTS '
-                                                  'WHERE SUBJECT = %s',
-                                                  (subject,))).fetchone()
         await gather(self.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS '
                                      'WHERE SUBJECT = %s', (subj_id,)),
                      self.db.execute('DELETE FROM ACCEPTED_SUBJECTS '
@@ -116,4 +113,4 @@ class SubjectsTables:
             return subjects
 
         cur = await (await self.db.execute('SELECT * FROM SUBJECTS')).fetchall()
-        return [subj[1] for subj in cur]
+        return [{ 'id': subj[0], 'subject': subj[1] } for subj in cur]

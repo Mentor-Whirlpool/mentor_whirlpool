@@ -80,8 +80,8 @@ class MentorsTables:
                                                     (chat_id,))).fetchone()]
         if student is not None:
             mentors = await (await self.db.execute('SELECT MENTOR FROM MENTORS_STUDENTS '
-                                                  'WHERE STUDENT= %s',
-                                                  (student,))).fetchall()
+                                                   'WHERE STUDENT= %s',
+                                                   (student,))).fetchall()
             if not mentors:
                 return []
             # parameter is just mentor, as it is already a tuple
@@ -159,8 +159,8 @@ class MentorsTables:
         ----------
         id_field : int
             ID (not chat_id) of mentor to edit
-        subjects : iterable(str)
-            Strings of subjects
+        subjects : iterable(integer)
+            Database IDs of subjects to tether
 
         Raises
         ------
@@ -169,10 +169,9 @@ class MentorsTables:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        subj_ids = await gather(*[self.add_subject(subj) for subj in subjects])
         await gather(*[self.db.execute('INSERT INTO MENTORS_SUBJECTS VALUES('
-                                       '%s, %s)', (id_field, subj,)) 
-                       for subj in subj_ids])
+                                       '%s, %s) ON CONFLICT DO NOTHING', (id_field, subj,)) 
+                       for subj in subjects])
         await self.db.commit()
 
     async def remove_mentor_subjects(self, id_field, subjects):
@@ -183,8 +182,8 @@ class MentorsTables:
         ----------
         id_field : int
             ID (not chat_id) of mentor to edit
-        subjects : iterable(str)
-            strings of subject
+        subjects : iterable(integer)
+            Database IDs of subjects to untether
 
         Raises
         ------
@@ -193,12 +192,8 @@ class MentorsTables:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        subj_ids = [await (await self.db.execute('SELECT ID FROM SUBJECTS '
-                                                 'WHERE SUBJECT = %s',
-                                                 (subj,))).fetchone()
-                    for subj in subjects]
         await gather(*[self.db.execute('DELETE FROM MENTORS_SUBJECTS '
                                        'WHERE MENTOR = %s AND '
                                        'SUBJECT = %s', (id_field, subj,))
-                       for (subj,) in subj_ids])
+                       for subj in subjects])
         await self.db.commit()
