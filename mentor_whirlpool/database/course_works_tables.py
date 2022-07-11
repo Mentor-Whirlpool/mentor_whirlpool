@@ -64,8 +64,8 @@ class CourseWorksTables:
 
         Parameters
         ----------
-        subjects : iterable(str)
-            All strings, indicating needed subjects
+        subjects : iterable(integer)
+            All database ids, indicating needed subjects
             If empty, consider all possible subjects needed
 
         Raises
@@ -84,14 +84,10 @@ class CourseWorksTables:
                                                 'WHERE ID = %s', (id_field,))).fetchone()]
             return await self.assemble_courses_dict(res)
         if subjects:
-            subj_ids = [cur for (cur,) in
-                        [await (await self.db.execute('SELECT ID FROM SUBJECTS '
-                                                      'WHERE SUBJECT = %s', (subj,))).fetchone()
-                         for subj in subjects]]
             ids = await (await self.db.execute('SELECT COURSE_WORK FROM COURSE_WORKS_SUBJECTS '
-                                               'WHERE SUBJECT = ANY(%s)', (subj_ids,))).fetchall()
+                                               'WHERE SUBJECT = ANY(%s)', (subjects,))).fetchall()
             ids += await (await self.db.execute('SELECT COURSE_WORK FROM ACCEPTED_SUBJECTS '
-                                                'WHERE SUBJECT = ANY(%s)', (subj_ids,))).fetchall()
+                                                'WHERE SUBJECT = ANY(%s)', (subjects,))).fetchall()
             ids = set(ids)
             works = [await (await self.db.execute('SELECT * FROM COURSE_WORKS '
                                                   'WHERE ID = %s', (id_f,))).fetchone()
