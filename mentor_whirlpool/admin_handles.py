@@ -2,9 +2,7 @@ from mentor_whirlpool.telegram import bot
 from telebot import types, asyncio_filters
 from telebot.asyncio_handler_backends import State, StatesGroup
 from mentor_whirlpool.database import Database
-from re import fullmatch
 from asyncio import create_task, gather
-from mentor_whirlpool.confirm import confirm
 from mentor_whirlpool.mentor_handles import mentor_start
 from mentor_whirlpool.students_handles import generic_start
 from mentor_whirlpool.support_handles import support_start
@@ -97,7 +95,7 @@ async def edit_subjects(message):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
         return
     markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(*[types.InlineKeyboardButton(f'Удалить: {subj}', callback_data=f'adm_rem_subj_{subj}')
+    markup.add(*[types.InlineKeyboardButton(f'Удалить: {subj}', callback_data=f'adm_rem_subj_{subj["id"]}')
                  for subj in await db.get_subjects()])
     markup.add(types.InlineKeyboardButton('Добавить направление',
                                           callback_data='adm_add_subj'))
@@ -110,7 +108,7 @@ async def save_subject(message):
     logging.debug(f'chat_id: {message.from_user.id} is in add_subject')
 
     db = Database()
-    if message.text in await db.get_subjects():
+    if message.text in [subj['subject'] for subj in await db.get_subjects()]:
         await gather(bot.delete_state(message.from_user.id),
                      bot.send_message(message.from_user.id, "Предмет уже добавлен."))
         logging.warn(f'chat_id: {message.from_user.id} subject already added')
@@ -140,10 +138,10 @@ async def course_work(message):
         return
 
     course_works = await db.get_course_works()
-    messages = []
     if course_works:
-        for work in course_works:
-            messages.append(f'@{(await db.get_students(work["student"]))[0]["name"]}\n{work["description"]}')
+        messages = [f'@{(await db.get_students(work["student"]))[0]["name"]}\n'\
+                    f'{work["description"]}'
+                    for work in course_works]
         message_course_works = '\n--------\n'.join(messages)
         await bot.send_message(message.from_user.id, message_course_works)
     else:
@@ -173,7 +171,7 @@ async def list_mentors(message):
     for mentor in mentors:
 
         markup = types.InlineKeyboardMarkup()
-        markup.add(types.InlineKeyboardButton('Выбрать', callback_data='admin_choose_mentor_' + str(mentor['chat_id'])))
+        markup.add(types.InlineKeyboardButton('Выбрать', callback_data=f'admin_choose_mentor_{str(mentor["chat_id"])}'))
 
         if not mentor['subjects']:
             tasks.append(
@@ -182,10 +180,10 @@ async def list_mentors(message):
                                  parse_mode='html'))
             continue
 
-        subjects_count_dict = dict.fromkeys(mentor['subjects'], 0)
+        subjects_count_dict = dict.fromkeys([subj['subject'] for subj in mentor['subjects']], 0)
 
         for student in mentor['students']:
-            for subject in student['course_works'][0]['subjects']:
+            for subject in [subj['subject'] for subj in student['course_works'][0]['subjects']]:
 
                 if subject in subjects_count_dict:
                     subjects_count_dict[subject] += 1
@@ -272,9 +270,9 @@ async def callback_add_student_subject_choice(call):
     mentor_subjects = (await db.get_mentors(chat_id=call.data[33:]))[0]['subjects']
 
     markup = types.InlineKeyboardMarkup()
-    markup.add(*[types.InlineKeyboardButton(subject,
-                                            callback_data='admin_add_student_with_subject_' + subject + '_' + call.data[
-                                                                                                              33:])
+    markup.add(*[types.InlineKeyboardButton(subject['subject'],
+                                            callback_data=f'admin_add_student_with_subject_'\
+                                                          f'{subject["id"]}_{call.data[33:]}')
                  for subject in mentor_subjects])
 
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_add_student_subject_choice')
@@ -295,7 +293,7 @@ async def callback_add_student(call):
                  bot.send_message(call.from_user.id,
                                   'Добавлять студента СТРОГО в формате <pre>@student;course_work_name</pre>',
                                   parse_mode='html'),
-                 bot.send_message(call.from_user.id, f'Добавить студента для {mentor_chat_id} {subject}',
+                 bot.send_message(call.from_user.id, f'Добавить студента для {mentor_chat_id} {subject["name"]}',
                                   reply_markup=force),
                  bot.answer_callback_query(call.id))
     logging.debug(f'chat_id: {call.from_user.id} done admin_add_student_with_subject')
@@ -305,7 +303,15 @@ async def callback_add_student(call):
     'Добавить студента для '))
 async def callback_user_add_subject(message):
     db = Database()
-    mentor_chat_id, subject = message.reply_to_message.text[22:].split()
+    mentor_chat_id, subject_name = message.reply_to_message.text[22:].split()
+    subject = None
+    for subj in await db.get_subjects():
+        if subject_name == subj['subject']:
+            subject = subj
+            break
+    if subject is None:
+        await bot.send_message(message.from_user.id, f'Направление {subject_name} НЕ НАЙДЕНО')
+        return
     logging.debug(f'chat_id: {message.from_user.id} getting mentor with chat_id {mentor_chat_id}')
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
     logging.debug(f'chat_id: {message.from_user.id} got mentor with id {mentor_id}')
@@ -324,13 +330,13 @@ async def callback_user_add_subject(message):
     logging.debug(f'chat_id: {message.from_user.id} preparing ADD_STUDENT_FOR')
     await gather(
         db.accept_work(mentor_id, await db.add_course_work(
-            {'name': student_name, 'chat_id': student_chat_id, 'subjects': [subject],
+            {'name': student_name, 'chat_id': student_chat_id, 'subjects': [subject['id']],
              'description': course_work_name})),
         bot.send_message(message.from_user.id,
                          f'Студент {student_name} добавлен к ментору {(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}'),
         bot.send_message(mentor_chat_id, f'Студент @{student_name} привязан к Вам админом'),
         bot.send_message(student_chat_id,
-                         f'@{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]} привязан к Вам админом')
+                         f'@{student_name} привязан к Вам админом')
     )
     logging.debug(f'chat_id: {message.from_user.id} done ADD_STUDENT_FOR')
 
@@ -341,7 +347,8 @@ async def callback_delete_student_info(call):
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
         *[types.InlineKeyboardButton(f'{student["name"]}',
-                                     callback_data=f'admin_delete_stud_{call.data[26:]}_{str(student["course_works"][0]["id"])}_{student["id"]}')
+                                     callback_data=f'admin_delete_stud_'\
+                                                   f'{call.data[26:]}_{str(student["course_works"][0]["id"])}_{student["id"]}')
           for student in (await db.get_mentors(chat_id=int(call.data[26:])))[0]['students']])
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_student_info')
     await gather(bot.delete_message(call.from_user.id, call.message.id),
@@ -395,9 +402,9 @@ async def callback_delete_subject_info(call):
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
-        *[types.InlineKeyboardButton(subject, callback_data='admin_delete_subject_' + subject + '_' + call.data[26:])
-          for
-          subject in mentor_subjects])
+        *[types.InlineKeyboardButton(subject['subject'], callback_data=f'admin_delete_subject_'\
+                                                                       f'{subject["id"]}_call.data[26:]')
+          for subject in mentor_subjects])
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_subject_info')
     await gather(bot.delete_message(call.from_user.id, call.message.id),
                  bot.answer_callback_query(call.id),
@@ -410,17 +417,21 @@ async def callback_delete_subject_info(call):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_delete_subject_'))
 async def callback_delete_subject(call):
     db = Database()
-    subject, mentor_chat_id = call.data[21:].split('_')
+    subject_id, mentor_chat_id = call.data[21:].split('_')
+    subject = await db.get_subjects(subject_id)
+    if subject is None:
+        await bot.send_message(call.from_user.id, f'Направление НЕ НАЙДЕНО')
+        return
     logging.debug(f'chat_id: {call.from_user.id} getting mentor with chat_id {mentor_chat_id}')
     mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
     logging.debug(f'chat_id: {call.from_user.id} got mentor with id {mentor_id}')
 
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_subject')
     await gather(
-        db.remove_mentor_subjects(mentor_id, [subject]),
-        bot.send_message(mentor_chat_id, f'Тема {subject} успешно удалена админом'),
+        db.remove_mentor_subjects(mentor_id, [subject['id']]),
+        bot.send_message(mentor_chat_id, f'Тема {subject["subject"]} успешно удалена админом'),
         bot.send_message(call.from_user.id,
-                         f'Тема {subject} успешно удалена у @{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}',
+                         f'Тема {subject["name"]} успешно удалена у @{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}',
                          ),
         bot.answer_callback_query(call.id),
         bot.delete_message(call.from_user.id, call.message.id))
@@ -449,21 +460,25 @@ async def callback_user_add_subject(message):
 
     mentor_chat_id = message.reply_to_message.text[18:]
     logging.debug(f'chat_id: {message.from_user.id} getting mentor with chat_id {mentor_chat_id}')
-    mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
-    logging.debug(f'chat_id: {message.from_user.id} got mentor with id {mentor_id}')
+    mentor = (await db.get_mentors(chat_id=mentor_chat_id))[0]
+    logging.debug(f'chat_id: {message.from_user.id} got mentor {mentor}')
     subjects_to_add = message.text.strip().split(';')
     for subject in subjects_to_add:
 
         await db.add_subject(subject)
-        mentor_subjects = (await db.get_mentors(chat_id=mentor_chat_id))[0]['subjects']
-        if mentor_subjects and subject in mentor_subjects:
+        has_subject = False
+        for subj in mentor['subjects']:
+            if subj['subject'] == subject:
+                has_subject = True
+                break
+
+        if has_subject:
             await bot.send_message(message.from_user.id, f'Тема <b>{subject}</b> уже была добавлена', parse_mode='html')
             return
 
-        add_mentor_sub_task = create_task(db.add_mentor_subjects(mentor_id, [subject]))
         logging.debug(f'chat_id: {message.from_user.id} preparing ADD SUBJECT FOR')
-        await bot.send_message(message.from_user.id, f'Тема <b>{subject}</b> успешно добавлена', parse_mode='html')
-        await add_mentor_sub_task
+        await gather(bot.send_message(message.from_user.id, f'Тема <b>{subject}</b> успешно добавлена', parse_mode='html'),
+                     db.add_mentor_subjects(mentor['id'], [await db.add_subject(subject)]))
         logging.debug(f'chat_id: {message.from_user.id} done ADD SUBJECT FOR')
 
 

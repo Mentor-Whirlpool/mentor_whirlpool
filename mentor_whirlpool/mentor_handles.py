@@ -160,7 +160,7 @@ async def my_subjects(message):
     if my_subjects_:
         delete = types.InlineKeyboardButton('Удалить', callback_data='mnt_sub_to_delete')
         markup.row(add, delete)
-        message_subjects += '\n'.join(my_subjects_)
+        message_subjects += '\n'.join([subj['subject'] for subj in my_subjects_])
     else:
         markup.add(add)
 
@@ -174,14 +174,15 @@ async def my_subjects(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith('subject_'))
 async def callback_show_course_works_by_subject(call):
     db = Database()
+    subject = await db.get_subjects(id_field=call.data[8:])
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
         *[types.InlineKeyboardButton(f'{work["student"]} {work["description"]}',
                                      callback_data='work_' + str(work['id'])) for work in
-          await db.get_course_works([call.data[8:]])])  # добавление курсачей будет в callback_query_work
+          await db.get_course_works(subjects=[subject['id']])])  # добавление курсачей будет в callback_query_work
     await gather(bot.answer_callback_query(call.id),
                  bot.delete_message(call.from_user.id, call.message.id),
-                 bot.send_message(call.from_user.id, f'Курсовые работы по направлению *{call.data[8:]}*',
+                 bot.send_message(call.from_user.id, f'Курсовые работы по направлению *{subject["subject"]}*',
                                   reply_markup=markup,
                                   parse_mode='html'))
 
@@ -200,7 +201,7 @@ async def callback_show_subjects_to_add(call):
     if subjects_to_add:
         markup = types.InlineKeyboardMarkup()
         markup.add(
-            *[types.InlineKeyboardButton(subject, callback_data='mnt_sub_add_' + subject)
+            *[types.InlineKeyboardButton(subject, callback_data='mnt_sub_add_' + subject['id'])
               for subject in subjects_to_add])
         await bot.send_message(call.from_user.id, '<b>Все направления</b>',
                                reply_markup=markup, parse_mode='html')
@@ -218,7 +219,7 @@ async def callback_add_subject(call):
     myself = (await db.get_mentors(chat_id=call.from_user.id))[0]
     logging.debug(f'chat_id: {call.from_user.id} info {myself}')
 
-    if not myself['subjects'] or call.data[12:] not in myself['subjects']:
+    if not myself['subjects'] or call.data[12:] not in [my_subj['id'] for my_subj in myself['subjects']]:
         logging.debug(f'chat_id: {call.from_user.id} adding subject {call.data[12:]}')
         await gather(db.add_mentor_subjects(myself['id'], [call.data[12:]]),
                      bot.send_message(call.from_user.id,
@@ -257,11 +258,12 @@ async def callback_show_subjects_to_delete(call):
 async def callback_del_subject(call):
     db = Database()
     my_id = (await db.get_mentors(chat_id=call.from_user.id))[0]['id']
+    subject = (await db.get_subjects(call.data[15:]))[0]
 
     logging.debug(f'chat_id: {call.from_user.id} preparing mnt_sub_delete')
-    await gather(db.remove_mentor_subjects(my_id, [call.data[15:]]),
+    await gather(db.remove_mentor_subjects(my_id, subject['id']),
                  bot.send_message(call.from_user.id,
-                                  f'Направление <b>{call.data[15:]}</b> успешно удалено',
+                                  f'Направление <b>{subject["subject"]}</b> успешно удалено',
                                   parse_mode='html'),
                  bot.delete_message(call.from_user.id, call.message.id),
                  bot.answer_callback_query(call.id))
