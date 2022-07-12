@@ -2,6 +2,12 @@ name: Nose2 coverage report
 
 on: [push]
 
+env:
+  POSTGRE_USER: postgres
+  POSTGRE_PASSWD: s3cret
+  POSTGRE_ADDRESS: localhost
+  POSTGRE_PORT: 5432
+
 jobs:
   database-tests:
     runs-on: ubuntu-latest
@@ -14,8 +20,8 @@ jobs:
         uses: Harmon758/postgresql-action@v1.0.0
         with:
           postgresql db: mentor_whirlpool
-          postgresql user: postgres
-          postgresql password: s3cret
+          postgresql user: $POSTGRE_USER
+          postgresql password: $POSTGRE_PASSWD
       - name: Setup environment
         run: python3 -m pip install -r requirements.txt
       - name: Run tests
