@@ -81,7 +81,7 @@ async def add_request(message):
         if set(await db.get_subjects()) == set(stud_accepted_subj):
             await bot.send_message(message.from_user.id,
                                    'Ты уже добавили все возможные направления!\n'
-                                   'Если  остались вопросы, обратись в поддержку')
+                                   'Если остались вопросы, обратись в поддержку')
             return
         if len(stud_accepted_subj) > 2:
             await bot.send_message(message.from_user.id,
@@ -97,7 +97,7 @@ async def add_request(message):
                                "Выбери направление, которая вас интересует:",
                                reply_markup=markup)
         return
-    markup.add(*[types.InlineKeyboardButton(sub, callback_data=f'add_request_{sub}')
+    markup.add(*[types.InlineKeyboardButton(sub, callback_data=f'add_request_{sub["id"]}')
                  for sub in await db.get_subjects()
                  if sub not in stud_accepted_subj])
     logging.debug(f'chat_id: {message.from_user.id} preparing ADD_REQUEST')
@@ -112,6 +112,8 @@ async def readmission_request(call):
     logging.debug(f'chat_id: {call.from_user.id} is in ADDITIONAL_MENTOR')
 
     id = await db.get_students(chat_id=call.from_user.id)
+    new_subj_id = int(call.data[6:])
+    new_subj = (await db.get_subjects(new_subj_id))[0]
     accepted = None
     if id:
         accepted = await db.get_accepted(student=id[0]['id'])
@@ -120,11 +122,11 @@ async def readmission_request(call):
         await bot.send_message(call.from_user.id, 'Тебя ещё не курирует ментор')
         return
 
-    cw_id = await db.readmission_work(accepted[0]['id'], call.data[6:])
+    cw_id = await db.readmission_work(accepted[0]['id'], new_subj['id'])
     accept_markup = types.InlineKeyboardMarkup(row_width=1)
     accept_markup.add(types.InlineKeyboardButton('Принять', callback_data=f'mnt_work_{cw_id}'))
     mentors_to_alert = [ment for ment in await db.get_mentors()
-                        if call.data[6:] in ment['subjects']]
+                        if new_subj in ment['subjects']]
     logging.debug(f'chat_id: {call.from_user.id} preparing ADD_REQUEST')
     await gather(bot.answer_callback_query(call.id),
                  bot.send_message(call.from_user.id,
@@ -132,37 +134,12 @@ async def readmission_request(call):
                                   'Если передумаешь, можно отменить '
                                   'запрос, используя "Удалить запрос"'),
                  *[bot.send_message(ment['chat_id'],
-                                    f'Поступил новый запрос на доп. ментора по вашему направлению: {call.data[6:]} от @{call.from_user.username}]!\n'
+                                    f'Поступил новый запрос на доп. ментора по вашему направлению: {new_subj["subject"]} от @{call.from_user.username}]!\n'
                                     f'Тема: {accepted[0]["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert
                    if ment not in await db.get_mentors(student=id[0]['id'])])
     logging.debug(f'chat_id: {call.from_user.id} done ADD_REQUEST')
-
-
-# TODO: deprecated 
-@bot.message_handler(state=StudentStates.add_own_subject_flag)
-async def add_own_subject(message):
-    db = Database()
-    logging.debug(f'chat_id: {message.from_user.id} is in add_own_subject_flag')
-    subjects = await db.get_subjects()
-
-    if message.text in subjects:
-        logging.debug(f'chat_id: {message.from_user.id} preparing add_own_subject_flag')
-        await gather(bot.delete_state(message.from_user.id, message.chat.id),
-                     bot.send_message(message.chat.id, "Предмет с таким названием уже существует!"))
-        logging.debug(f'chat_id: {message.from_user.id} done add_own_subject_flag')
-    else:
-        async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-            data['subject'] = message.text
-
-        db = Database()
-        subjects = await db.get_subjects()
-
-        logging.debug(f'chat_id: {message.from_user.id} preparing add_own_subject_flag')
-        await gather(bot.set_state(message.from_user.id, StudentStates.add_work_flag, message.chat.id),
-                     bot.send_message(message.chat.id, "Введите название работы:"))
-        logging.debug(f'chat_id: {message.from_user.id} done add_own_subject_flag')
 
 
 @bot.message_handler(state=StudentStates.add_work_flag)
@@ -176,7 +153,7 @@ async def save_request(message):
                         'description': entered_topic}
 
     db = Database()
-    id = await db.get_students(chat_id=message.chat.id)
+    id = await db.get_students(chat_id=message.from_user.id)
     logging.debug(f'chat_id: {message.from_user.id} self {id}')
 
     if id:
@@ -315,13 +292,15 @@ async def mentor_resume(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("add_request_"))
 async def select_subject_callback(call):
     logging.debug(f'chat_id: {call.from_user.id} is in add_request')
-    await bot.send_message(call.from_user.id, f"<b>Тема: {call.data[12:]}</b>\n\n"
+    db = Database()
+    subject = (await db.get_subjects(call.data[12:]))[0]
+    await bot.send_message(call.from_user.id, f"<b>Тема: {subject['subject']}</b>\n\n"
                                               f"Введи название работы. \n\n<b>Если не знаешь, на какую тему будешь писать работу, "
                                               f"просто напиши \"Открыт к предложениям\":</b>", parse_mode='Html')
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
-        data['subject'] = call.data[12:]
+        data['subject'] = subject['id']
 
     await bot.answer_callback_query(call.id)
 
