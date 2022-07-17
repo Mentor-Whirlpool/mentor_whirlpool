@@ -78,6 +78,10 @@ class SubjectsTables:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        if id_field is not None:
+            subject = await (await self.db.execute('SELECT * FROM SUBJECTS '
+                                                   'WHERE ID = %s', (id_field,))).fetchone()
+            return [{'id': subject[0], 'subject': subject[1]}]
         if work_id is not None:
             # this code right here may look horrible and ugly and unreadable
             # and that may be true, but doing it this way, according to the
@@ -95,22 +99,22 @@ class SubjectsTables:
                                       for subj in subj_cur])
             ids = await (await self.db.execute('SELECT SUBJECT FROM ACCEPTED_SUBJECTS '
                                                'WHERE COURSE_WORK = %s', (work_id,))).fetchall()
-            subj_cur = await gather(*[self.db.execute('SELECT SUBJECT FROM SUBJECTS '
+            subj_cur = await gather(*[self.db.execute('SELECT * FROM SUBJECTS '
                                                       'WHERE ID = %s', (id_f,))
                                       for (id_f,) in ids])
             subjects += await gather(*[subj.fetchone()
                                       for subj in subj_cur])
-            return [subj[0] for subj in subjects]
+            return [{'id': subj[0], 'subject': subj[1]} for subj in subjects]
         if mentor_id is not None:
             ids = [cur for (cur,) in
                    await (await self.db.execute('SELECT SUBJECT FROM MENTORS_SUBJECTS '
                                                 'WHERE MENTOR = %s',
                                                 (mentor_id,))).fetchall()]
             ids = set(ids)
-            subjects = [(await (await self.db.execute('SELECT SUBJECT FROM SUBJECTS '
-                                                      'WHERE ID = %s', (id_f,))).fetchone())[0]
+            subjects = [(await (await self.db.execute('SELECT * FROM SUBJECTS '
+                                                      'WHERE ID = %s', (id_f,))).fetchone())
                         for id_f in ids]
-            return subjects
+            return [{'id': subj[0], 'subject': subj[1]} for subj in subjects]
 
         cur = await (await self.db.execute('SELECT * FROM SUBJECTS')).fetchall()
-        return [{ 'id': subj[0], 'subject': subj[1] } for subj in cur]
+        return [{'id': subj[0], 'subject': subj[1]} for subj in cur]

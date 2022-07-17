@@ -201,7 +201,7 @@ async def callback_show_subjects_to_add(call):
     if subjects_to_add:
         markup = types.InlineKeyboardMarkup()
         markup.add(
-            *[types.InlineKeyboardButton(subject, callback_data='mnt_sub_add_' + subject['id'])
+            *[types.InlineKeyboardButton(subject['subject'], callback_data='mnt_sub_add_' + str(subject['id']))
               for subject in subjects_to_add])
         await bot.send_message(call.from_user.id, '<b>Все направления</b>',
                                reply_markup=markup, parse_mode='html')
@@ -242,7 +242,7 @@ async def callback_show_subjects_to_delete(call):
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
-        *[types.InlineKeyboardButton(subject, callback_data='mnt_sub_delete_' + subject)
+        *[types.InlineKeyboardButton(subject['subject'], callback_data='mnt_sub_delete_' + str(subject['id']))
           for subject in my_subjects_])
     logging.debug(f'chat_id: {call.from_user.id} preparing mnt_sub_to_delete')
     await gather(bot.answer_callback_query(call.id),
@@ -261,7 +261,7 @@ async def callback_del_subject(call):
     subject = (await db.get_subjects(call.data[15:]))[0]
 
     logging.debug(f'chat_id: {call.from_user.id} preparing mnt_sub_delete')
-    await gather(db.remove_mentor_subjects(my_id, subject['id']),
+    await gather(db.remove_mentor_subjects(my_id, [subject['id']]),
                  bot.send_message(call.from_user.id,
                                   f'Направление <b>{subject["subject"]}</b> успешно удалено',
                                   parse_mode='html'),

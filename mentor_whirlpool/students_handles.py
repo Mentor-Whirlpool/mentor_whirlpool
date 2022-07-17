@@ -170,7 +170,8 @@ async def save_request(message):
     accept_markup = types.InlineKeyboardMarkup(row_width=1)
     accept_markup.add(types.InlineKeyboardButton('Принять', callback_data=f'mnt_work_{cw_id}'))
     mentors_to_alert = [ment['chat_id'] for ment in await db.get_mentors()
-                        if student_dict['subjects'][0] in ment['subjects']]
+                        if student_dict['subjects'][0] in
+                        [subj['subject'] for subj in ment['subjects']]]
     await gather(bot.delete_state(message.from_user.id, message.chat.id),
                  bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
                                                    "\nЕсли вы захотите запросить дополнительного ментора, нажми кнопку "

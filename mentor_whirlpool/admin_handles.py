@@ -209,7 +209,7 @@ async def callback_mentors_info(call):
     message_subjects = 'Нет выбранных направлений'
     message_students = 'Нет студентов'
     if mentor_info['subjects']:
-        message_subjects = '\n'.join(mentor_info['subjects'])
+        message_subjects = '\n'.join([subj['subject'] for subj in mentor_info['subjects']])
     if mentor_info['students']:
         message_students = '\n'.join(student['name'] for student in mentor_info['students'])
     markup = types.InlineKeyboardMarkup()
@@ -403,7 +403,7 @@ async def callback_delete_subject_info(call):
     markup = types.InlineKeyboardMarkup()
     markup.add(
         *[types.InlineKeyboardButton(subject['subject'], callback_data=f'admin_delete_subject_'\
-                                                                       f'{subject["id"]}_call.data[26:]')
+                                                                       f'{subject["id"]}_{call.data[26:]}')
           for subject in mentor_subjects])
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_subject_info')
     await gather(bot.delete_message(call.from_user.id, call.message.id),
@@ -418,21 +418,21 @@ async def callback_delete_subject_info(call):
 async def callback_delete_subject(call):
     db = Database()
     subject_id, mentor_chat_id = call.data[21:].split('_')
-    subject = await db.get_subjects(subject_id)
+    subject = (await db.get_subjects(subject_id))[0]
+    logging.debug(f'chat_id {call.from_user.id} got subject {subject}')
     if subject is None:
         await bot.send_message(call.from_user.id, f'Направление НЕ НАЙДЕНО')
         return
     logging.debug(f'chat_id: {call.from_user.id} getting mentor with chat_id {mentor_chat_id}')
-    mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
-    logging.debug(f'chat_id: {call.from_user.id} got mentor with id {mentor_id}')
+    mentor = (await db.get_mentors(chat_id=mentor_chat_id))[0]
+    logging.debug(f'chat_id: {call.from_user.id} got mentor {mentor}')
 
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_subject')
     await gather(
-        db.remove_mentor_subjects(mentor_id, [subject['id']]),
+        db.remove_mentor_subjects(mentor['id'], [subject['id']]),
         bot.send_message(mentor_chat_id, f'Тема {subject["subject"]} успешно удалена админом'),
         bot.send_message(call.from_user.id,
-                         f'Тема {subject["name"]} успешно удалена у @{(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}',
-                         ),
+                         f'Тема {subject["subject"]} успешно удалена у @{mentor["name"]}'),
         bot.answer_callback_query(call.id),
         bot.delete_message(call.from_user.id, call.message.id))
     logging.debug(f'chat_id: {call.from_user.id} done admin_delete_subject')
