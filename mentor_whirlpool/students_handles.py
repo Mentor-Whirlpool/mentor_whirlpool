@@ -78,7 +78,9 @@ async def add_request(message):
             stud_accepted_subj += work['subjects']
     markup = types.InlineKeyboardMarkup(row_width=1)
     if id and stud_accepted_subj:
-        if set(await db.get_subjects()) == set(stud_accepted_subj):
+        all_subjects = await db.get_subjects()
+        # stud_accepted_subj is identical with all_subjects aside from sorting
+        if not [subj for subj in all_subjects if subj not in stud_accepted_subj]:
             await bot.send_message(message.from_user.id,
                                    'Ты уже добавили все возможные направления!\n'
                                    'Если остались вопросы, обратись в поддержку')
@@ -171,8 +173,6 @@ async def save_request(message):
     accept_markup = types.InlineKeyboardMarkup(row_width=1)
     accept_markup.add(types.InlineKeyboardButton('Принять', callback_data=f'mnt_work_{cw_id}'))
     subject = (await subject)[0]
-    for ment in await db.get_mentors():
-        logging.debug('mentor subjects: ', ment['subjects'], '\tour subject:', subject)
     mentors_to_alert = [ment['chat_id'] for ment in await db.get_mentors()
                         if subject in ment['subjects']]
     await gather(bot.delete_state(message.from_user.id, message.chat.id),

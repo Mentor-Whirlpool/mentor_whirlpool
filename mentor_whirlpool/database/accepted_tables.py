@@ -117,9 +117,8 @@ class AcceptedTables:
         ----------
         work_id : int
             database id of the course work
-        new_subj : str
-            TODO: str -> int (id)
-            new subject of a course work
+        new_subj : int
+            database ID of a new subject of a course work
 
         Raises
         ------
@@ -141,11 +140,8 @@ class AcceptedTables:
                                                 'RETURNING ID',
                                                 (line[1], line[2],))).fetchone()
         if new_subj is not None:
-            (subj_id,) = await (await self.db.execute('SELECT ID FROM SUBJECTS '
-                                                      'WHERE SUBJECT = %s',
-                                                      (new_subj,))).fetchone()
             await self.db.execute('INSERT INTO COURSE_WORKS_SUBJECTS VALUES('
-                                  '%s, %s)', (cw_id, subj_id))
+                                  '%s, %s)', (cw_id, new_subj,))
         await self.db.commit()
         return cw_id
 
