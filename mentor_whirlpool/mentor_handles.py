@@ -65,7 +65,7 @@ async def works(message):
     if not my_subjects_:
         await bot.send_message(message.chat.id, '<b>Сначала добавьте направления!</b>', parse_mode='html')
         return
-    course_works = await db.get_course_works(subjects=my_subjects_)
+    course_works = await db.get_course_works(subjects=[subj['id'] for subj in my_subjects_])
     logging.debug(f'available course works for specified subjects: {course_works}')
     students = (await db.get_mentors(chat_id=message.from_user.id))[0]['students']
     logging.debug(f'served students: {students}')
@@ -85,12 +85,12 @@ async def works(message):
         if await db.get_accepted(student=work['student']):
             markup.add(
                 types.InlineKeyboardButton(
-                    f'@{(await db.get_students(work["student"]))[0]["name"]} - {work["subjects"][0]} - {work["description"]} (доп. запрос)',
+                    f'@{(await db.get_students(work["student"]))[0]["name"]} - {work["subjects"][0]["subject"]} - {work["description"]} (доп. запрос)',
                     callback_data='mnt_work_' + str(work['id'])))
             continue
         markup.add(
             types.InlineKeyboardButton(
-                f'@{(await db.get_students(work["student"]))[0]["name"]} - {work["subjects"][0]} - {work["description"]}',
+                f'@{(await db.get_students(work["student"]))[0]["name"]} - {work["subjects"][0]["subject"]} - {work["description"]}',
                 callback_data='mnt_work_' + str(work['id'])))
 
     logging.debug(f'chat_id: {message.from_user.id} preparing COURSE_WORKS')
@@ -288,7 +288,7 @@ async def my_students(message):
         str_my_students_ = 'У Вас нет студентов!'
     else:
         str_my_students_ = '\n'.join(
-            '@' + student['name'] + ' - ' + student['course_works'][0]['subjects'][0] + ' - ' +
+            '@' + student['name'] + ' - ' + student['course_works'][0]['subjects'][0]['subject'] + ' - ' +
             student["course_works"][0]["description"]
             for student in my_students_)
     logging.debug(f'chat_id: {message.from_user.id} preparing MY_STUDENTS')
