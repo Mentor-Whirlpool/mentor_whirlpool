@@ -92,7 +92,7 @@ class SubjectsTables:
             ids = await (await self.db.execute('SELECT SUBJECT FROM COURSE_WORKS_SUBJECTS '
                                                'WHERE COURSE_WORK = %s',
                                                (work_id,))).fetchall()
-            subj_cur = await gather(*[self.db.execute('SELECT SUBJECT FROM SUBJECTS '
+            subj_cur = await gather(*[self.db.execute('SELECT * FROM SUBJECTS '
                                                       'WHERE ID = %s', (id_f,))
                                       for (id_f,) in ids])
             subjects = await gather(*[subj.fetchone()

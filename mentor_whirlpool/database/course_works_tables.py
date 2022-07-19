@@ -36,10 +36,9 @@ class CourseWorksTables:
                                              'DEFAULT, %s, %s) '
                                              'RETURNING ID',
                                              (stud_id, line['description'],))).fetchone())[0]
-        subj_ids = await gather(*[self.add_subject(subj) for subj in line['subjects']])
         await gather(*[self.db.execute('INSERT INTO COURSE_WORKS_SUBJECTS VALUES('
                                        '%s, %s) ON CONFLICT DO NOTHING', (work, subj,))
-                       for subj in subj_ids])
+                       for subj in line['subjects']])
         await self.db.commit()
         return work
 
