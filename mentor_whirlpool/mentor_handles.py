@@ -365,10 +365,43 @@ async def callback_add_idea(call):
 @bot.message_handler(state=MentorStates.add_idea)
 async def save_idea(message):
     db = Database()
-    await gather(#db.add_subject(message.text), TODO когда будет готова бд
-                 bot.delete_state(message.from_user.id),
-                 bot.send_message(message.from_user.id, "Предмет успешно добавлен."))
+    await gather(  # db.add_subject(message.text), TODO когда будет готова бд
+        bot.delete_state(message.from_user.id),
+        bot.send_message(message.from_user.id, "Предмет успешно добавлен."))
 
     logging.debug(f'chat_id: {message.from_user.id} idea has been added')
 
 
+@bot.callback_query_handler(func=lambda call: call.data == 'mnt_idea_to_del')
+async def callback_del_idea_by_mentor(call):
+    db = Database()
+    mentor_ideas = await db.get_idea(chat_id=call.from_user.id)
+
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(*[types.InlineKeyboardButton(idea['name'], callback_data='mnt_idea_del_' + str(idea['id']))
+                 for idea in mentor_ideas])
+
+    logging.debug(f'chat_id: {call.from_user.id} preparing mnt_idea_to_del')
+    await gather(bot.answer_callback_query(call.id),
+                 bot.delete_message(call.from_user.id, call.message.id),
+                 bot.send_message(call.from_user.id,
+                                  '<b>Удалить пет-проект</b>',
+                                  reply_markup=markup,
+                                  parse_mode='html'))
+    logging.debug(f'chat_id: {call.from_user.id} done mnt_idea_to_del')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_idea_del_'))
+async def callback_del_idea(call):
+    db = Database()
+    my_id = (await db.get_mentors(chat_id=call.from_user.id))[0]['id']
+    idea = (await db.get_idea(call.data[13:]))[0]
+
+    logging.debug(f'chat_id: {call.from_user.id} preparing mnt_idea_del_')
+    await gather(db.remove_mentor_idea(my_id, [idea['id']]),
+                 bot.send_message(call.from_user.id,
+                                  f'Направление <b>{idea["name"]}</b> успешно удалено',
+                                  parse_mode='html'),
+                 bot.delete_message(call.from_user.id, call.message.id),
+                 bot.answer_callback_query(call.id))
+    logging.debug(f'chat_id: {call.from_user.id} done mnt_idea_del_')
