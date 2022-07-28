@@ -317,7 +317,8 @@ async def start_idea_by_mentor(message):
         return
     markup = types.InlineKeyboardMarkup()
     markup.add(types.InlineKeyboardButton('Добавить', callback_data='mnt_add_idea'),
-               types.InlineKeyboardButton('Удалить', callback_data='mnt_del_idea'))
+               types.InlineKeyboardButton('Удалить', callback_data='mnt_idea_to_del'))
+    await bot.send_message(message.from_user.id, 'Тут список уже существующих идей')  # TODO когда будет готова бд
     await bot.send_message(message.from_user.id, 'Что сделать?', reply_markup=markup)
 
 
@@ -341,11 +342,33 @@ async def add_idea_by_mentor(call):
         return
     markup = types.InlineKeyboardMarkup(row_width=3)
     markup.add(
-        *[types.InlineKeyboardButton(sub['subject'], callback_data='mnt_sub_for_idea_' + str(sub['id'])) for sub in my_subjects_])
+        *[types.InlineKeyboardButton(sub['subject'], callback_data='mnt_sub_for_idea_' + str(sub['id'])) for sub in
+          my_subjects_])
 
     logging.debug(f'chat_id: {call.from_user.id} preparing MY_SUBJECTS')
     await bot.send_message(call.from_user.id, f'{message_subjects}', reply_markup=markup, parse_mode='html')
     logging.debug(f'chat_id: {call.from_user.id} done MY_SUBJECTS')
 
-# @bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_sub_for_idea_'))
-# async def callback_add_idea(call):
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_sub_for_idea_'))
+async def callback_add_idea(call):
+    db = Database()
+    subject = (await db.get_subjects(id_field=call.data[17:]))[0]
+    logging.debug(f'chat_id: {call.from_user.id} preparing add_idea')
+    await gather(bot.set_state(call.from_user.id, MentorStates.add_idea),
+                 bot.send_message(call.from_user.id, f"<b>Тема: {subject['subject']}</b>\n\n"
+                                                     f"Введи название работы.\n", parse_mode='Html'),
+                 bot.delete_message(call.from_user.id, call.message.id))
+    logging.debug(f'chat_id: {call.from_user.id} done add_idea')
+
+
+@bot.message_handler(state=MentorStates.add_idea)
+async def save_idea(message):
+    db = Database()
+    await gather(#db.add_subject(message.text), TODO когда будет готова бд
+                 bot.delete_state(message.from_user.id),
+                 bot.send_message(message.from_user.id, "Предмет успешно добавлен."))
+
+    logging.debug(f'chat_id: {message.from_user.id} idea has been added')
+
+
