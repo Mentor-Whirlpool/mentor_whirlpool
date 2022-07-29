@@ -1,9 +1,17 @@
 from mentor_whirlpool.telegram import bot
 from telebot import types
 from mentor_whirlpool.confirm import confirm
+from telebot.asyncio_handler_backends import State, StatesGroup
 from mentor_whirlpool.database import Database
 from asyncio import gather, create_task
 import logging
+
+logging.getLogger(__name__)
+
+
+class MentorStates(StatesGroup):
+    add_idea = State()
+    add_support = State()
 
 
 async def mentor_start(message):
@@ -21,7 +29,7 @@ async def mentor_start(message):
     iterable
         Iterable with all handles texts
     """
-    return ['Запросы', 'Мои направления', 'Мои студенты', 'Поддержка']
+    return ['Запросы', 'Мои направления', 'Мои студенты', 'Пет-проект', 'Поддержка']
 
 
 async def mentor_help():
@@ -295,3 +303,108 @@ async def my_students(message):
     await bot.send_message(message.chat.id,
                            f'Список моих студентов\n{str_my_students_}')
     logging.debug(f'chat_id: {message.from_user.id} done MY_STUDENTS')
+
+
+@bot.message_handler(func=lambda msg: msg.text == 'Пет-проект')
+async def start_idea_by_mentor(message):
+
+    await bot.delete_message(message.chat.id, message.id)
+    await bot.send_message(message.from_user.id, 'В разработке')
+    # await bot.delete_message(message.chat.id, message.id)
+    # logging.debug(f'Delete message  [{message.text}: {message.from_user.id}]')
+    #
+    # db = Database()
+    # if not await db.check_is_mentor(message.from_user.id):
+    #     logging.warning(f'User isn\'t a mentor [user_id: {message.from_user.id}]')
+    #     await bot.send_message(message.chat.id, '<b>Вы не ментор</b>', parse_mode='html')
+    #     return
+    # markup = types.InlineKeyboardMarkup()
+    # markup.add(types.InlineKeyboardButton('Добавить', callback_data='mnt_add_idea'),
+    #            types.InlineKeyboardButton('Удалить', callback_data='mnt_idea_to_del'))
+    # await bot.send_message(message.from_user.id, 'Тут список уже существующих идей')  # TODO когда будет готова бд
+    # await bot.send_message(message.from_user.id, 'Что сделать?', reply_markup=markup)
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'mnt_add_idea')
+async def add_idea_by_mentor(call):
+    await bot.delete_message(call.from_user.id, call.message.id)
+    logging.debug(f'Delete message  [{call.data}: {call.from_user.id}]')
+
+    await bot.answer_callback_query(call.id)
+
+    db = Database()
+
+    my_subjects_ = (await db.get_mentors(chat_id=call.from_user.id))[0]['subjects']
+    logging.debug(f'subjects: {my_subjects_} for user_id: {call.from_user.id}')
+
+    message_subjects = '<b>Выберете направление пет-проекта</b>\n'
+
+    if not my_subjects_:
+        await bot.send_message(call.from_user.id, '<b>Сначала добавьте направления!</b>', parse_mode='html')
+        logging.warning(f'chat_id: {call.from_user.id} doesn\'t have any subjects')
+        return
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(
+        *[types.InlineKeyboardButton(sub['subject'], callback_data='mnt_sub_for_idea_' + str(sub['id'])) for sub in
+          my_subjects_])
+
+    logging.debug(f'chat_id: {call.from_user.id} preparing MY_SUBJECTS')
+    await bot.send_message(call.from_user.id, f'{message_subjects}', reply_markup=markup, parse_mode='html')
+    logging.debug(f'chat_id: {call.from_user.id} done MY_SUBJECTS')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_sub_for_idea_'))
+async def callback_add_idea(call):
+    db = Database()
+    subject = (await db.get_subjects(id_field=call.data[17:]))[0]
+    logging.debug(f'chat_id: {call.from_user.id} preparing add_idea')
+    await gather(bot.set_state(call.from_user.id, MentorStates.add_idea),
+                 bot.send_message(call.from_user.id, f"<b>Тема: {subject['subject']}</b>\n\n"
+                                                     f"Введи название работы.\n", parse_mode='Html'),
+                 bot.delete_message(call.from_user.id, call.message.id))
+    logging.debug(f'chat_id: {call.from_user.id} done add_idea')
+
+
+@bot.message_handler(state=MentorStates.add_idea)
+async def save_idea(message):
+    db = Database()
+    await gather(  # db.add_subject(message.text), TODO когда будет готова бд
+        bot.delete_state(message.from_user.id),
+        bot.send_message(message.from_user.id, "Предмет успешно добавлен."))
+
+    logging.debug(f'chat_id: {message.from_user.id} idea has been added')
+
+
+@bot.callback_query_handler(func=lambda call: call.data == 'mnt_idea_to_del')
+async def callback_del_idea_by_mentor(call):
+    db = Database()
+    mentor_ideas = await db.get_idea(chat_id=call.from_user.id)
+
+    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup.add(*[types.InlineKeyboardButton(idea['name'], callback_data='mnt_idea_del_' + str(idea['id']))
+                 for idea in mentor_ideas])
+
+    logging.debug(f'chat_id: {call.from_user.id} preparing mnt_idea_to_del')
+    await gather(bot.answer_callback_query(call.id),
+                 bot.delete_message(call.from_user.id, call.message.id),
+                 bot.send_message(call.from_user.id,
+                                  '<b>Удалить пет-проект</b>',
+                                  reply_markup=markup,
+                                  parse_mode='html'))
+    logging.debug(f'chat_id: {call.from_user.id} done mnt_idea_to_del')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('mnt_idea_del_'))
+async def callback_del_idea(call):
+    db = Database()
+    my_id = (await db.get_mentors(chat_id=call.from_user.id))[0]['id']
+    idea = (await db.get_idea(call.data[13:]))[0]
+
+    logging.debug(f'chat_id: {call.from_user.id} preparing mnt_idea_del_')
+    await gather(db.remove_mentor_idea(my_id, [idea['id']]),
+                 bot.send_message(call.from_user.id,
+                                  f'Направление <b>{idea["name"]}</b> успешно удалено',
+                                  parse_mode='html'),
+                 bot.delete_message(call.from_user.id, call.message.id),
+                 bot.answer_callback_query(call.id))
+    logging.debug(f'chat_id: {call.from_user.id} done mnt_idea_del_')

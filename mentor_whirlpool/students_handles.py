@@ -31,7 +31,7 @@ async def generic_start(message):
     iterable
         Iterable with all handles texts
     """
-    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы',
+    commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Идеи',
                 'Хочу стать ментором', 'Поддержка']
     return commands
 
@@ -350,6 +350,29 @@ async def delete_finale(call):
                    for ment in mentors],
                  bot.delete_message(call.message.chat.id, call.message.id))
     logging.debug(f'chat_id: {call.from_user.id} done delete_finale')
+
+
+@bot.message_handler(func=lambda msg: msg.text == 'Идеи')
+async def start_show_idea(message):
+    await bot.delete_message(message.chat.id, message.id)
+    db = Database()
+
+    if await db.check_is_mentor(message.from_user.id):
+        logging.warning(f'chat_id: {message.from_user.id} is a mentor')
+        return
+
+    ideas = '<b>Идеи от менторов</b>\n' \
+            '- Проверка ЭП по qr коду\n' \
+            '- Распределеный УЦ (Блокчейн)\n' \
+            '- УЦ для экспериментов с криптомодулями\n' \
+            '- Анализатор безопасности смарт-контрактов\n' \
+            '- Гостовый ssl сканер\n' \
+            '- Сервис для автоматического плана путешествий\n' \
+            '- Сервис для составления расписания\n' \
+            '- Веб-рация (вроде Discord)\n' \
+            '- Конвертор между музыкальными сервисами\n'
+
+    await bot.send_message(message.from_user.id, ideas, parse_mode='html')
 
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))
