@@ -307,19 +307,22 @@ async def my_students(message):
 
 @bot.message_handler(func=lambda msg: msg.text == 'Пет-проект')
 async def start_idea_by_mentor(message):
-    await bot.delete_message(message.chat.id, message.id)
-    logging.debug(f'Delete message  [{message.text}: {message.from_user.id}]')
 
-    db = Database()
-    if not await db.check_is_mentor(message.from_user.id):
-        logging.warning(f'User isn\'t a mentor [user_id: {message.from_user.id}]')
-        await bot.send_message(message.chat.id, '<b>Вы не ментор</b>', parse_mode='html')
-        return
-    markup = types.InlineKeyboardMarkup()
-    markup.add(types.InlineKeyboardButton('Добавить', callback_data='mnt_add_idea'),
-               types.InlineKeyboardButton('Удалить', callback_data='mnt_idea_to_del'))
-    await bot.send_message(message.from_user.id, 'Тут список уже существующих идей')  # TODO когда будет готова бд
-    await bot.send_message(message.from_user.id, 'Что сделать?', reply_markup=markup)
+    await bot.delete_message(message.chat.id, message.id)
+    await bot.send_message(message.from_user.id, 'В разработке')
+    # await bot.delete_message(message.chat.id, message.id)
+    # logging.debug(f'Delete message  [{message.text}: {message.from_user.id}]')
+    #
+    # db = Database()
+    # if not await db.check_is_mentor(message.from_user.id):
+    #     logging.warning(f'User isn\'t a mentor [user_id: {message.from_user.id}]')
+    #     await bot.send_message(message.chat.id, '<b>Вы не ментор</b>', parse_mode='html')
+    #     return
+    # markup = types.InlineKeyboardMarkup()
+    # markup.add(types.InlineKeyboardButton('Добавить', callback_data='mnt_add_idea'),
+    #            types.InlineKeyboardButton('Удалить', callback_data='mnt_idea_to_del'))
+    # await bot.send_message(message.from_user.id, 'Тут список уже существующих идей')  # TODO когда будет готова бд
+    # await bot.send_message(message.from_user.id, 'Что сделать?', reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'mnt_add_idea')
