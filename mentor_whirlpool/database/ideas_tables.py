@@ -30,11 +30,11 @@ class IdeasTables:
                               line)
         # need to do it separately, otherwise fetchone will hang the runtime on
         # database not returning anything
-        stud_id = (await self.get_students(chat_id=line['chat_id']))[0]['id']
+        mentor_id = (await self.get_mentors(chat_id=line['chat_id']))[0]['id']
         work = (await (await self.db.execute('INSERT INTO IDEAS VALUES('
                                              'DEFAULT, %s, %s) '
                                              'RETURNING ID',
-                                             (stud_id, line['description'],))).fetchone())[0]
+                                             (mentor_id, line['description'],))).fetchone())[0]
         await gather(*[self.db.execute('INSERT INTO IDEAS_SUBJECTS VALUES('
                                        '%s, %s) ON CONFLICT DO NOTHING', (work, subj,))
                        for subj in line['subjects']])
