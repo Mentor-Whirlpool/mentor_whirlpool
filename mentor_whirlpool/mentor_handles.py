@@ -318,7 +318,8 @@ async def start_idea_by_mentor(message):
                types.InlineKeyboardButton('Удалить', callback_data='mnt_idea_to_del'))
     ideas = await db.get_ideas()
     logging.debug(ideas)
-    await bot.send_message(message.from_user.id, '\n'.join(['Уже существующие идеи:'] + ['- ' + idea['description'] for idea in ideas]))
+    await bot.send_message(message.from_user.id,
+                           '\n'.join(['Уже существующие идеи:'] + ['- ' + idea['description'] for idea in ideas]))
     await bot.send_message(message.from_user.id, 'Что сделать?', reply_markup=markup)
 
 
@@ -367,35 +368,35 @@ async def callback_add_idea(call):
 @bot.message_handler(state=MentorStates.add_idea)
 async def save_idea(message):
     logging.debug(f'chat_id: {message.from_user.id} is in add_work_flag')
-    idea = dict()
+    # idea = dict() вроде можно убрать эту строчку
 
     async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
         idea = {'name': message.from_user.username,
-                        'chat_id': message.chat.id,
-                        'subjects': [data['subject']],
-                        'description': message.text}
+                'chat_id': message.chat.id,
+                'subjects': [data['subject']],
+                'description': message.text}
 
     db = Database()
-    subject = create_task(db.get_subjects(idea['subjects'][0]))
+    # subject = create_task(db.get_subjects(idea['subjects'][0])) вроде нигде не используется
     id = await db.get_mentors(chat_id=message.from_user.id)
     logging.debug(f'chat_id: {message.from_user.id} self {id}')
 
     if id:
         ideas = await db.get_ideas(mentor=id[0]['id'])
-        ideas_names = [work['description'] for work in ideas]
+        # ideas_names = [work['description'] for work in ideas] вроде нигде не используется
 
         if idea['description'] in ideas:
-            logging.warn(f'chat_id: {message.from_user.id} work already exists')
+            logging.warning(f'chat_id: {message.from_user.id} idea already exists')
             await gather(bot.delete_state(message.from_user.id, message.chat.id),
-                         bot.send_message(message.chat.id, "Работа с такой темой уже добавлена!"))
+                         bot.send_message(message.chat.id, "Пет-проект с такой темой уже добавлен!"))
             return
     logging.debug(f'chat_id: {message.from_user.id} preparing add_work_flag')
     await gather(db.add_idea(idea),
+                 bot.delete_message(message.from_user.id, message.id),
                  bot.delete_state(message.from_user.id, message.chat.id),
-                 bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
-                                                   "\nЕсли вы захотите запросить дополнительного ментора, нажми кнопку "
-                                                   "<b>\"Добавить запрос\"</b>", parse_mode="Html"))
-    logging.debug(f'chat_id: {message.from_user.id} done add_work_flag')
+                 bot.send_message(message.chat.id, f"Пет-проект <b>{message.text}</b> успешно добавлен!",
+                                  parse_mode="Html"))
+    logging.debug(f'chat_id: {message.from_user.id} done add_idea')
 
 
 @bot.callback_query_handler(func=lambda call: call.data == 'mnt_idea_to_del')
