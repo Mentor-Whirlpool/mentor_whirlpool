@@ -3,6 +3,55 @@ from asyncio import gather
 
 
 class AcceptedTables:
+    async def accept_idea(self, student_id, work_id):
+        """
+        Moves a line from COURSE_WORKS to ACCEPTED table, increments LOAD
+        column in MENTORS table and appends ID into COURSE_WORKS column
+        Does nothing if a line exists
+
+        Parameters
+        ----------
+        student_id: int
+            database id of the student
+        work_id : int
+            database id of the course work
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBDoesNotExist
+        DBAlreadyExists
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        line = await (await self.db.execute('SELECT * FROM IDEAS '
+                                            'WHERE ID = %s', (work_id,))).fetchone()
+        if line is None:
+            return
+        cw_subj = await (await self.db.execute('SELECT SUBJECT FROM IDEAS_SUBJECTS '
+                                               'WHERE IDEA = %s', (work_id,))).fetchall()
+        accepted_from_stud = await self.get_accepted(student=line[1])
+        if not accepted_from_stud:
+            await gather(self.db.execute('INSERT INTO ACCEPTED VALUES('
+                                         '%s, %s, %s)',
+                                         (line[0], student_id, line[2],)),
+                                       # id      student  description
+                         *[self.db.execute('INSERT INTO ACCEPTED_SUBJECTS VALUES('
+                                           '%s, %s) ON CONFLICT (COURSE_WORK, SUBJECT) DO NOTHING',
+                                           (work_id, subj,))
+                           for (subj,) in cw_subj])
+        else:
+            await gather(*[self.db.execute('INSERT INTO ACCEPTED_SUBJECTS VALUES('
+                                           '%s, %s)',
+                                           (accepted_from_stud[0]['id'], subj,))
+                           for (subj,) in cw_subj])
+        await gather(self.remove_idea(line[0]),
+                     self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1 '
+                                     'WHERE ID = %s', (line[1],)),
+                     self.db.execute('INSERT INTO MENTORS_STUDENTS VALUES('
+                                     '%s, %s)', (line[1], student_id,)))
+        await self.db.commit()
+
     async def accept_work(self, mentor_id, work_id):
         """
         Moves a line from COURSE_WORKS to ACCEPTED table, increments LOAD

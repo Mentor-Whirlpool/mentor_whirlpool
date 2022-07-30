@@ -8,10 +8,11 @@ from mentor_whirlpool.database.mentors_tables import MentorsTables
 from mentor_whirlpool.database.admins_tables import AdminsTables
 from mentor_whirlpool.database.supports_tables import SupportsTables
 from mentor_whirlpool.database.subjects_tables import SubjectsTables
+from mentor_whirlpool.database.ideas_tables import IdeasTables
 
 
 class Database(StudentTables, CourseWorksTables, AcceptedTables, MentorsTables,
-               AdminsTables, SupportsTables, SubjectsTables):
+               IdeasTables, AdminsTables, SupportsTables, SubjectsTables):
     def __init__(self):
         self.db = None
         self.conn_opts = ('dbname=mentor_whirlpool '
@@ -63,6 +64,14 @@ class Database(StudentTables, CourseWorksTables, AcceptedTables, MentorsTables,
                                      'MENTOR BIGINT NOT NULL REFERENCES MENTORS(ID),'
                                      'STUDENT BIGINT NOT NULL REFERENCES STUDENTS(ID),'
                                      'UNIQUE(MENTOR, STUDENT))'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS IDEAS('
+                                     'ID BIGSERIAL PRIMARY KEY,'
+                                     'MENTOR BIGINT NOT NULL REFERENCES MENTORS(ID),'
+                                     'DESCRIPTION TEXT)'),
+                     self.db.execute('CREATE TABLE IF NOT EXISTS IDEAS_SUBJECTS('
+                                     'IDEA BIGINT NOT NULL REFERENCES IDEAS(ID),'
+                                     'SUBJECT BIGINT NOT NULL REFERENCES SUBJECTS(ID),'
+                                     'UNIQUE(IDEA, SUBJECT))'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS ADMINS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'CHAT_ID BIGINT NOT NULL UNIQUE)'),
