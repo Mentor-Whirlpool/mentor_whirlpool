@@ -6,7 +6,7 @@ import logging
 from mentor_whirlpool.database import Database
 from mentor_whirlpool.students_handles import generic_start, student_help
 from mentor_whirlpool.mentor_handles import mentor_start, mentor_help
-from mentor_whirlpool.admin_handles import admin_start, admin_help
+from mentor_whirlpool.admin_handle.main_admin import admin_start, admin_help
 from mentor_whirlpool.support_handles import support_start
 
 
