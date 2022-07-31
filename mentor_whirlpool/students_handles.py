@@ -299,7 +299,8 @@ async def select_subject_callback(call):
     db = Database()
     subject = (await db.get_subjects(call.data[12:]))[0]
     await bot.send_message(call.from_user.id, f"<b>Тема: {subject['subject']}</b>\n\n"
-                                              f"Введи название работы. \n\n<b>Если не знаешь, на какую тему будешь писать работу, "
+                                              f"Введи название работы. \n\n"
+                                              f"<b>Если не знаешь, на какую тему будешь писать работу, "
                                               f"просто напиши \"Открыт к предложениям\":</b>", parse_mode='Html')
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
@@ -360,19 +361,38 @@ async def start_show_idea(message):
     if await db.check_is_mentor(message.from_user.id):
         logging.warning(f'chat_id: {message.from_user.id} is a mentor')
         return
+    markup = types.InlineKeyboardMarkup()
+    subjects = await db.get_subjects()
+    for subject in subjects:
+        markup.add(
+            types.InlineKeyboardButton(subject['subject'], callback_data='std_sub_for_idea_' + str(subject['id'])))
+    await bot.send_message(message.from_user.id, 'Выберите направление', reply_markup=markup, parse_mode='html')
 
-    ideas = '<b>Идеи от менторов</b>\n' \
-            '- Проверка ЭП по qr коду\n' \
-            '- Распределеный УЦ (Блокчейн)\n' \
-            '- УЦ для экспериментов с криптомодулями\n' \
-            '- Анализатор безопасности смарт-контрактов\n' \
-            '- Гостовый ssl сканер\n' \
-            '- Сервис для автоматического плана путешествий\n' \
-            '- Сервис для составления расписания\n' \
-            '- Веб-рация (вроде Discord)\n' \
-            '- Конвертор между музыкальными сервисами\n'
 
-    await bot.send_message(message.from_user.id, ideas, parse_mode='html')
+@bot.callback_query_handler(func=lambda call: call.data.startswith("std_sub_for_idea_"))
+async def callback_list_of_ideas_for_sub(call):
+    db = Database()
+    markup = types.InlineKeyboardMarkup()
+    sub_id = call.data[17:]
+    ideas_str = '<b>Идеи от менторов</b>\n'
+    ideas = await db.get_ideas(subjects=[sub_id])
+    for idea in ideas:
+        markup.add(types.InlineKeyboardButton(
+            idea['description'] + ' -  @' + str((await db.get_mentors(id=idea['mentor']))[0]['name']),
+            callback_data='std_add_idea_' + str(idea['id'])))
+    await bot.answer_callback_query(call.id)
+    await bot.send_message(call.from_user.id, ideas_str, reply_markup=markup, parse_mode='html')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith("std_add_idea_"))
+async def callback_accept_idea(call):
+    db = Database()
+    idea_id = call.data[13:]
+    await gather(
+        bot.answer_callback_query(call.id),
+        bot.send_message(call.from_user.id, 'Вы успешно взялись за идею от ментора'),
+        db.accept_idea({'name': call.from_user.username, 'chat_id': call.from_user.id}, idea_id)
+    )
 
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))
