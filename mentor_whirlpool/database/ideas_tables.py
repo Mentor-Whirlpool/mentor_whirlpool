@@ -84,9 +84,6 @@ class IdeasTables:
         if subjects:
             ids = await (await self.db.execute('SELECT IDEA FROM IDEAS_SUBJECTS '
                                                'WHERE SUBJECT = ANY(%s)', (subjects,))).fetchall()
-            ids += await (await self.db.execute('SELECT IDEA FROM ACCEPTED_SUBJECTS '
-                                                'WHERE SUBJECT = ANY(%s)', (subjects,))).fetchall()
-            ids = set(ids)
             works = [await (await self.db.execute('SELECT * FROM IDEAS '
                                                   'WHERE ID = %s', (id_f,))).fetchone()
                      for (id_f,) in ids]
