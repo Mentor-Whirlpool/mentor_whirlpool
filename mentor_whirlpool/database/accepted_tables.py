@@ -3,7 +3,7 @@ from asyncio import gather
 
 
 class AcceptedTables:
-    async def accept_idea(self, student_id, work_id):
+    async def accept_idea(self, student, work_id):
         """
         Moves a line from COURSE_WORKS to ACCEPTED table, increments LOAD
         column in MENTORS table and appends ID into COURSE_WORKS column
@@ -11,8 +11,8 @@ class AcceptedTables:
 
         Parameters
         ----------
-        student_id: int
-            database id of the student
+        student_id: dict
+            Dict with field names: 'name' and 'chat_id'
         work_id : int
             database id of the course work
 
@@ -24,6 +24,9 @@ class AcceptedTables:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('INSERT INTO STUDENTS VALUES('
+                              'DEFAULT, %(name)s, %(chat_id)s) '
+                              'ON CONFLICT (CHAT_ID) DO NOTHING', student)
         line = await (await self.db.execute('SELECT * FROM IDEAS '
                                             'WHERE ID = %s', (work_id,))).fetchone()
         if line is None:
