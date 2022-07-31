@@ -50,7 +50,13 @@ class AcceptedTables:
                                            '%s, %s)',
                                            (accepted_from_stud[0]['id'], subj,))
                            for (subj,) in cw_subj])
+        student_works = await (await self.db.execute('SELECT ID FROM COURSE_WORKS WHERE STUDENT = %s', (student_id,))).fetchall()
+        await gather()
         await gather(self.remove_idea(line[0]),
+                     *[self.db.execute('DELETE FROM COURSE_WORKS_SUBJECTS WHERE COURSE_WORK = %s',
+                                        work) for work in student_works],
+                     self.db.execute('DELETE FROM COURSE_WORKS WHERE STUDENT = %s',
+                                     (student_id,)),
                      self.db.execute('UPDATE MENTORS SET LOAD = LOAD + 1 '
                                      'WHERE ID = %s', (line[1],)),
                      self.db.execute('INSERT INTO MENTORS_STUDENTS VALUES('
