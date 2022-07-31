@@ -363,7 +363,7 @@ async def start_show_idea(message):
         return
 
     id = await db.get_students(chat_id=message.chat.id)
-    if await db.get_course_works(student=id[0]['id']):
+    if id and await db.get_accepted(student=id[0]['id']):
         logging.warning(f'chat_id: {message.from_user.id} student already has work')
 
         await bot.send_message(message.from_user.id,
