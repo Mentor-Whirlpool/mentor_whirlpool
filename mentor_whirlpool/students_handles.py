@@ -361,6 +361,15 @@ async def start_show_idea(message):
     if await db.check_is_mentor(message.from_user.id):
         logging.warning(f'chat_id: {message.from_user.id} is a mentor')
         return
+
+    id = await db.get_students(chat_id=message.chat.id)
+    if await db.get_course_works(student=id[0]['id']):
+        logging.warning(f'chat_id: {message.from_user.id} student already has work')
+
+        await bot.send_message(message.from_user.id,
+                               "Тебя уже обслуживает ментор\n")
+        return
+
     markup = types.InlineKeyboardMarkup()
     subjects = await db.get_subjects()
     for subject in subjects:
