@@ -397,9 +397,11 @@ async def callback_list_of_ideas_for_sub(call):
 async def callback_accept_idea(call):
     db = Database()
     idea_id = call.data[13:]
+    idea = await db.get_ideas(id_field=idea_id)
     await gather(
         bot.answer_callback_query(call.id),
         bot.send_message(call.from_user.id, 'Вы успешно взялись за идею от ментора'),
+        bot.send_message((await db.get_mentors(id=idea[0]['mentor']))[0]['chat_id'], f'Вашу идею принял @{call.from_user.username}'),
         db.accept_idea({'name': call.from_user.username, 'chat_id': call.from_user.id}, idea_id)
     )
 
