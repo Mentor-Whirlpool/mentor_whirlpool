@@ -27,7 +27,7 @@ class AcceptedTables:
         await self.db.execute('INSERT INTO STUDENTS VALUES('
                               'DEFAULT, %(name)s, %(chat_id)s) '
                               'ON CONFLICT (CHAT_ID) DO NOTHING', student)
-        student_id = await (await self.db.execute('SELECT ID FROM STUDENTS WHERE CHAT_ID = %s',
+        (student_id,) = await (await self.db.execute('SELECT ID FROM STUDENTS WHERE CHAT_ID = %s',
                                                   (student['chat_id'],))).fetchone()
         line = await (await self.db.execute('SELECT * FROM IDEAS '
                                             'WHERE ID = %s', (work_id,))).fetchone()
