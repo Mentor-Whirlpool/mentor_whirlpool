@@ -27,13 +27,15 @@ class AcceptedTables:
         await self.db.execute('INSERT INTO STUDENTS VALUES('
                               'DEFAULT, %(name)s, %(chat_id)s) '
                               'ON CONFLICT (CHAT_ID) DO NOTHING', student)
+        student_id = await (await self.db.execute('SELECT ID FROM STUDENTS WHERE CHAT_ID = %s',
+                                                  (student['chat_id'],))).fetchone()
         line = await (await self.db.execute('SELECT * FROM IDEAS '
                                             'WHERE ID = %s', (work_id,))).fetchone()
         if line is None:
             return
         cw_subj = await (await self.db.execute('SELECT SUBJECT FROM IDEAS_SUBJECTS '
                                                'WHERE IDEA = %s', (work_id,))).fetchall()
-        accepted_from_stud = await self.get_accepted(student=line[1])
+        accepted_from_stud = await self.get_accepted(student=student_id)
         if not accepted_from_stud:
             await gather(self.db.execute('INSERT INTO ACCEPTED VALUES('
                                          '%s, %s, %s)',
