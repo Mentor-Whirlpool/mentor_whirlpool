@@ -87,7 +87,7 @@ async def works(message):
                 continue
     logging.debug('finished removing works')
 
-    markup = types.InlineKeyboardMarkup()
+    markup = types.InlineKeyboardMarkup(row_width=1)
 
     for work in course_works:
         if await db.get_accepted(student=work['student']):
@@ -183,7 +183,7 @@ async def my_subjects(message):
 async def callback_show_course_works_by_subject(call):
     db = Database()
     subject = await db.get_subjects(id_field=call.data[8:])
-    markup = types.InlineKeyboardMarkup(row_width=3)
+    markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
         *[types.InlineKeyboardButton(f'{work["student"]} {work["description"]}',
                                      callback_data='work_' + str(work['id'])) for work in
@@ -207,7 +207,7 @@ async def callback_show_subjects_to_add(call):
         subjects_to_add.remove(subject)
 
     if subjects_to_add:
-        markup = types.InlineKeyboardMarkup()
+        markup = types.InlineKeyboardMarkup(row_width=1)
         markup.add(
             *[types.InlineKeyboardButton(subject['subject'], callback_data='mnt_sub_add_' + str(subject['id']))
               for subject in subjects_to_add])
