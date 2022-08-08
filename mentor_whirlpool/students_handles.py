@@ -381,16 +381,19 @@ async def start_show_idea(message):
 @bot.callback_query_handler(func=lambda call: call.data.startswith("std_sub_for_idea_"))
 async def callback_list_of_ideas_for_sub(call):
     db = Database()
-    markup = types.InlineKeyboardMarkup()
+
     sub_id = call.data[17:]
     ideas_str = '<b>Идеи от менторов</b>\n'
     ideas = await db.get_ideas(subjects=[sub_id])
+    await bot.send_message(call.from_user.id, ideas_str, parse_mode='html')
     for idea in ideas:
+        markup = types.InlineKeyboardMarkup()
         markup.add(types.InlineKeyboardButton(
-            idea['description'] + ' -  @' + str((await db.get_mentors(id=idea['mentor']))[0]['name']),
+            'Взяться',
             callback_data='std_add_idea_' + str(idea['id'])))
+        await bot.send_message(call.from_user.id, '@' + str((await db.get_mentors(id=idea['mentor']))[0]['name']),
+                               reply_markup=markup)
     await bot.answer_callback_query(call.id)
-    await bot.send_message(call.from_user.id, ideas_str, reply_markup=markup, parse_mode='html')
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("std_add_idea_"))
@@ -401,7 +404,8 @@ async def callback_accept_idea(call):
     await gather(
         bot.answer_callback_query(call.id),
         bot.send_message(call.from_user.id, 'Вы успешно взялись за идею от ментора'),
-        bot.send_message((await db.get_mentors(id=idea[0]['mentor']))[0]['chat_id'], f'Вашу идею принял @{call.from_user.username}'),
+        bot.send_message((await db.get_mentors(id=idea[0]['mentor']))[0]['chat_id'],
+                         f'Вашу идею принял @{call.from_user.username}'),
         db.accept_idea({'name': call.from_user.username, 'chat_id': call.from_user.id}, idea_id)
     )
 
