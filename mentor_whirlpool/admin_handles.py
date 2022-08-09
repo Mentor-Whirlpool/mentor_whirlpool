@@ -313,8 +313,8 @@ async def callback_user_add_subject(message):
         await bot.send_message(message.from_user.id, f'Направление {subject_name} НЕ НАЙДЕНО')
         return
     logging.debug(f'chat_id: {message.from_user.id} getting mentor with chat_id {mentor_chat_id}')
-    mentor_id = (await db.get_mentors(chat_id=mentor_chat_id))[0]['id']
-    logging.debug(f'chat_id: {message.from_user.id} got mentor with id {mentor_id}')
+    mentor = (await db.get_mentors(chat_id=mentor_chat_id))[0]
+    logging.debug(f'chat_id: {message.from_user.id} got mentor with id {mentor["id"]}')
     student_name, course_work_name = message.text.strip()[1:].split(';')
 
     student_chat_id = None
@@ -329,14 +329,14 @@ async def callback_user_add_subject(message):
 
     logging.debug(f'chat_id: {message.from_user.id} preparing ADD_STUDENT_FOR')
     await gather(
-        db.accept_work(mentor_id, await db.add_course_work(
+        db.accept_work(mentor["id"], await db.add_course_work(
             {'name': student_name, 'chat_id': student_chat_id, 'subjects': [subject['id']],
              'description': course_work_name})),
         bot.send_message(message.from_user.id,
-                         f'Студент {student_name} добавлен к ментору {(await db.get_mentors(chat_id=mentor_chat_id))[0]["name"]}'),
+                         f'Студент {student_name} добавлен к ментору {mentor["name"]}'),
         bot.send_message(mentor_chat_id, f'Студент @{student_name} привязан к Вам админом'),
         bot.send_message(student_chat_id,
-                         f'@{student_name} привязан к Вам админом')
+                         f'@{mentor["name"]} привязан к Вам админом')
     )
     logging.debug(f'chat_id: {message.from_user.id} done ADD_STUDENT_FOR')
 
