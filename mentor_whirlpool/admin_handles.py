@@ -175,9 +175,8 @@ async def list_mentors(message):
 
         if not mentor['subjects']:
             tasks.append(
-                bot.send_message(message.from_user.id, f'<b>@{mentor["name"]}</b>\nНет выбранных направлений',
-                                 reply_markup=markup,
-                                 parse_mode='html'))
+                bot.send_message(message.from_user.id, f'__@{mentor["name"]}__\nНет выбранных направлений',
+                                 reply_markup=markup))
             continue
 
         subjects_count_dict = dict.fromkeys([subj['subject'] for subj in mentor['subjects']], 0)
@@ -193,8 +192,8 @@ async def list_mentors(message):
         message_subjects = '\n'.join(f'{k} - {v}' for k, v in subjects_count_dict.items())
 
         tasks.append(
-            bot.send_message(message.from_user.id, f'<b>@{mentor["name"]}</b>\n{message_subjects}', reply_markup=markup,
-                             parse_mode='html'))
+            bot.send_message(message.from_user.id, f'__@{mentor["name"]}__\n{message_subjects}',
+                             reply_markup=markup))
 
     logging.debug(f'chat_id: {message.from_user.id} preparing MENTORS')
     await gather(*tasks, bot.delete_message(message.chat.id, message.id))
@@ -293,8 +292,7 @@ async def callback_add_student(call):
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_add_student_with_subject')
     await gather(bot.delete_message(call.from_user.id, call.message.id),
                  bot.send_message(call.from_user.id,
-                                  'Добавлять студента СТРОГО в формате <pre>@student;course_work_name</pre>',
-                                  parse_mode='html'),
+                                  'Добавлять студента СТРОГО в формате `@student;course_work_name`'),
                  bot.send_message(call.from_user.id, f'Добавить студента для {mentor_chat_id} {subject[0]["subject"]}',
                                   reply_markup=force),
                  bot.answer_callback_query(call.id))
@@ -448,8 +446,7 @@ async def callback_add_subject_info(call):
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_add_subject')
     await gather(bot.delete_message(call.from_user.id, call.message.id),
                  bot.send_message(call.from_user.id,
-                                  'Добавлять тему/темы СТРОГО в формате <pre>тема1;тема2;тема3</pre>',
-                                  parse_mode='html'),
+                                  'Добавлять тему/темы СТРОГО в формате `тема1;тема2;тема3`'),
                  bot.send_message(call.from_user.id, f'Добавить тему для {mentor_chat_id}', reply_markup=force),
                  bot.answer_callback_query(call.id))
     logging.debug(f'chat_id: {call.from_user.id} done admin_add_subject')
@@ -475,11 +472,11 @@ async def callback_user_add_subject(message):
                 break
 
         if has_subject:
-            await bot.send_message(message.from_user.id, f'Тема <b>{subject}</b> уже была добавлена', parse_mode='html')
+            await bot.send_message(message.from_user.id, f'Тема __{subject}__ уже была добавлена')
             return
 
         logging.debug(f'chat_id: {message.from_user.id} preparing ADD SUBJECT FOR')
-        await gather(bot.send_message(message.from_user.id, f'Тема <b>{subject}</b> успешно добавлена', parse_mode='html'),
+        await gather(bot.send_message(message.from_user.id, f'Тема __{subject}__ успешно добавлена'),
                      db.add_mentor_subjects(mentor['id'], [await db.add_subject(subject)]))
         logging.debug(f'chat_id: {message.from_user.id} done ADD SUBJECT FOR')
 
