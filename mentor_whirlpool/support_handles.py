@@ -52,7 +52,7 @@ async def check_requests(message):
         )
     logging.debug(f'chat_id: {message.from_user.id} preparing SUPPORT_REQUESTS')
     await bot.send_message(message.chat.id, 'Запросы поддержки:',
-                           reply_markup=requests_list, parse_mode='Html')
+                           reply_markup=requests_list)
     logging.debug(f'chat_id: {message.from_user.id} done SUPPORT_REQUESTS')
 
 

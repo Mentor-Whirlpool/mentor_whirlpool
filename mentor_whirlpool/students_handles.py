@@ -178,7 +178,7 @@ async def save_request(message):
     await gather(bot.delete_state(message.from_user.id, message.chat.id),
                  bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
                                                    "\nЕсли вы захотите запросить дополнительного ментора, нажми кнопку "
-                                                   "<b>\"Добавить запрос\"</b>", parse_mode="Html"),
+                                                   "__\"Добавить запрос\"__"),
                  *[bot.send_message(ment,
                                     f'Поступил новый запрос по вашему направлению: {subject["subject"]} от @{student_dict["name"]}!\n'
                                     f'Тема: {student_dict["description"]}',
@@ -205,11 +205,11 @@ async def my_requests(message):
     student_request = create_task(db.get_course_works(student=id[0]['id']))
     if await db.get_accepted(student=id[0]['id']):
         logging.debug(f'chat_id: {message.from_user.id} preparing MY_REQUESTS')
-        text = f'Текущая принятая курсовая работа: <b>{id[0]["course_works"][0]["description"]}</b>\nТвои менторы: \n<b>'
+        text = f'Текущая принятая курсовая работа: __{id[0]["course_works"][0]["description"]}__\nТвои менторы: \n__'
         for ment in await db.get_mentors(student=id[0]['id']):
             text += f"@{ment['name']}\n"
-        text += "</b>"
-        await bot.send_message(message.from_user.id, text, parse_mode="Html")
+        text += "__"
+        await bot.send_message(message.from_user.id, text)
         student_request = await student_request
         if student_request:
             await bot.send_message(message.from_user.id,
@@ -220,8 +220,8 @@ async def my_requests(message):
     student_request = await student_request
     logging.debug(f'chat_id: {message.from_user.id} preparing MY_REQUESTS')
     await gather(*[bot.send_message(message.chat.id,
-                                    f"<b>Работа №{course_work['id']}</b>\nНаправление: {course_work['subjects'][0]['subject']}\n"
-                                    f"Тема работы: {course_work['description']}", parse_mode="Html")
+                                    f"__Работа №{course_work['id']}__\nНаправление: {course_work['subjects'][0]['subject']}\n"
+                                    f"Тема работы: {course_work['description']}")
                    for course_work in student_request])
     logging.debug(f'chat_id: {message.from_user.id} done MY_REQUESTS')
 
@@ -298,10 +298,10 @@ async def select_subject_callback(call):
     logging.debug(f'chat_id: {call.from_user.id} is in add_request')
     db = Database()
     subject = (await db.get_subjects(call.data[12:]))[0]
-    await bot.send_message(call.from_user.id, f"<b>Тема: {subject['subject']}</b>\n\n"
+    await bot.send_message(call.from_user.id, f"__Тема: {subject['subject']}__\n\n"
                                               f"Введи название работы. \n\n"
-                                              f"<b>Если не знаешь, на какую тему будешь писать работу, "
-                                              f"просто напиши \"Открыт к предложениям\":</b>", parse_mode='Html')
+                                              f"__Если не знаешь, на какую тему будешь писать работу, "
+                                              f"просто напиши \"Открыт к предложениям\":__", parse_mode='Html')
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
@@ -383,7 +383,7 @@ async def callback_list_of_ideas_for_sub(call):
     db = Database()
     markup = types.InlineKeyboardMarkup()
     sub_id = call.data[17:]
-    ideas_str = '<b>Идеи от менторов</b>\n'
+    ideas_str = '__Идеи от менторов__\n'
     ideas = await db.get_ideas(subjects=[sub_id])
     for idea in ideas:
         markup.add(types.InlineKeyboardButton(
