@@ -285,7 +285,9 @@ async def callback_add_student_subject_choice(call):
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_add_student_with_subject_'))
 async def callback_add_student(call):
+    db = Database()
     subject, mentor_chat_id = call.data[31:].split('_')
+    subject = await db.get_subjects(int(subject))
 
     force = types.ForceReply(selective=False)
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_add_student_with_subject')
@@ -293,7 +295,7 @@ async def callback_add_student(call):
                  bot.send_message(call.from_user.id,
                                   'Добавлять студента СТРОГО в формате <pre>@student;course_work_name</pre>',
                                   parse_mode='html'),
-                 bot.send_message(call.from_user.id, f'Добавить студента для {mentor_chat_id} {subject["name"]}',
+                 bot.send_message(call.from_user.id, f'Добавить студента для {mentor_chat_id} {subject[0]["subject"]}',
                                   reply_markup=force),
                  bot.answer_callback_query(call.id))
     logging.debug(f'chat_id: {call.from_user.id} done admin_add_student_with_subject')
