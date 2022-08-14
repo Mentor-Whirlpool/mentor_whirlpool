@@ -91,7 +91,7 @@ async def works(message):
 
     for work in course_works:
         stud = (await db.get_students(work["student"]))[0]
-        line = f'{get_pretty_mention_db(stud)} - {work["subjects"][0]["subject"]} - {work["description"]}'
+        line = f'{stud["name"]} - {work["subjects"][0]["subject"]} - {work["description"]}'
         if await db.get_accepted(student=work['student']):
             line += ' (доп. запрос)'
         markup.add(
@@ -180,7 +180,7 @@ async def callback_show_course_works_by_subject(call):
     subject = await db.get_subjects(id_field=call.data[8:])
     markup = types.InlineKeyboardMarkup(row_width=1)
     markup.add(
-        *[types.InlineKeyboardButton(f'{work["student"]} {work["description"]}',
+        *[types.InlineKeyboardButton(f'{(await db.get_students(work["student"]))[0]["name"]} - {work["description"]}',
                                      callback_data=f'work_{work["id"]}') for work in
           await db.get_course_works(subjects=[subject['id']])])  # добавление курсачей будет в callback_query_work
     await gather(bot.answer_callback_query(call.id),
