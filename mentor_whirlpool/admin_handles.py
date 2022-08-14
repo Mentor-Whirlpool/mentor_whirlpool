@@ -144,7 +144,7 @@ async def course_work(message):
     if course_works:
         async def get_message(work):
             stud = await db.get_students(work["student"])
-            return f'[@{stud[0]["name"]}](tg://user?id={stud[0]["chat_id"]})\n'\
+            return f'{get_pretty_mention_db(stud)}\n'\
                    f'{work["description"]}'
         messages = await gather(*[get_message(work) for work in course_works])
         message_course_works = '\n--------\n'.join(messages)
@@ -506,7 +506,7 @@ async def edit_subjects(message):
         logging.warn(f'MENTORS: chat_id: {message.from_user.id} is not an admin')
         return
     markup = types.InlineKeyboardMarkup(row_width=1)
-    markup.add(*[types.InlineKeyboardButton(f'Удалить: {get_pretty_mention_db(supp)}', callback_data=f'adm_rem_supp_{supp["id"]}')
+    markup.add(*[types.InlineKeyboardButton(f'Удалить: {supp["name"]}', callback_data=f'adm_rem_supp_{supp["id"]}')
                  for supp in await db.get_supports()])
     markup.add(types.InlineKeyboardButton('Добавить саппорта',
                                           callback_data='adm_add_supp'))
