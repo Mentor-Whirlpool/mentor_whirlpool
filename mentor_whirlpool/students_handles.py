@@ -4,7 +4,8 @@ from telebot import asyncio_filters
 from telebot.asyncio_handler_backends import State, StatesGroup
 from mentor_whirlpool.database import Database
 from asyncio import gather, create_task
-from mentor_whirlpool.confirm import confirm
+# from mentor_whirlpool.confirm import confirm
+from mentor_whirlpool.utils import get_pretty_mention, get_pretty_mention_db, get_name
 import random
 import logging
 
@@ -136,7 +137,8 @@ async def readmission_request(call):
                                   'Если передумаешь, можно отменить '
                                   'запрос, используя "Удалить запрос"'),
                  *[bot.send_message(ment['chat_id'],
-                                    f'Поступил новый запрос на доп. ментора по вашему направлению: {new_subj["subject"]} от @{call.from_user.username}]!\n'
+                                    f'Поступил новый запрос на доп. ментора по вашему направлению: {new_subj["subject"]} от '
+                                    f'{get_pretty_mention(call.from_user)}'
                                     f'Тема: {accepted[0]["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert
@@ -151,7 +153,9 @@ async def save_request(message):
     student_dict = dict()
 
     async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
-        student_dict = {'name': message.from_user.username, 'chat_id': message.chat.id, 'subjects': [data['subject']],
+        student_dict = {'name': get_name(message.from_user),
+                        'chat_id': message.chat.id,
+                        'subjects': [data['subject']],
                         'description': entered_topic}
 
     db = Database()
@@ -180,7 +184,8 @@ async def save_request(message):
                                                    "\nЕсли вы захотите запросить дополнительного ментора, нажми кнопку "
                                                    "__\"Добавить запрос\"__"),
                  *[bot.send_message(ment,
-                                    f'Поступил новый запрос по вашему направлению: {subject["subject"]} от @{student_dict["name"]}!\n'
+                                    f'Поступил новый запрос по вашему направлению: {subject["subject"]} от '
+                                    f'{get_pretty_mention_db(student_dict)}!\n'
                                     f'Тема: {student_dict["description"]}',
                                     reply_markup=accept_markup)
                    for ment in mentors_to_alert])
@@ -207,7 +212,7 @@ async def my_requests(message):
         logging.debug(f'chat_id: {message.from_user.id} preparing MY_REQUESTS')
         text = f'Текущая принятая курсовая работа: __{id[0]["course_works"][0]["description"]}__\nТвои менторы: \n__'
         for ment in await db.get_mentors(student=id[0]['id']):
-            text += f"@{ment['name']}\n"
+            text += f"{get_pretty_mention_db(ment)}\n"
         text += "__"
         await bot.send_message(message.from_user.id, text)
         student_request = await student_request
@@ -283,11 +288,11 @@ async def mentor_resume(message):
 
     markup = types.InlineKeyboardMarkup()
     markup.add(
-        types.InlineKeyboardButton('Одобрить', callback_data='add_mentor_via_admin_' + str(message.from_user.id)))
+        types.InlineKeyboardButton('Одобрить', callback_data=f'add_mentor_via_admin_{message.from_user.id}'))
 
     admin_chat_id = random.choice(admins)['chat_id']
     logging.debug(f'chat_id: {message.from_user.id} preparing BECOME_MENTOR_REQUEST')
-    await gather(bot.send_message(admin_chat_id, f"Пользователь @{message.from_user.username} хочет стать ментором.",
+    await gather(bot.send_message(admin_chat_id, f"Пользователь {get_pretty_mention(message.from_user)} хочет стать ментором.",
                                   reply_markup=markup),
                  bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!\n"))
     logging.debug(f'chat_id: {message.from_user.id} done BECOME_MENTOR_REQUEST')
@@ -301,7 +306,7 @@ async def select_subject_callback(call):
     await bot.send_message(call.from_user.id, f"__Тема: {subject['subject']}__\n\n"
                                               f"Введи название работы. \n\n"
                                               f"__Если не знаешь, на какую тему будешь писать работу, "
-                                              f"просто напиши \"Открыт к предложениям\":__", parse_mode='Html')
+                                              f"просто напиши \"Открыт к предложениям\":__")
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
@@ -346,7 +351,7 @@ async def delete_finale(call):
                  bot.send_message(call.from_user.id,
                                   "Курсовая работа успешно удалена. Но ты всегда можете начать новую!"),
                  *[bot.send_message(ment['chat_id'],
-                                    f"Студент @{student[0]['name']} удалил принятую вами "
+                                    f"Студент {get_pretty_mention_db(student[0])} удалил принятую вами "
                                     f"курсовую работу \"{student[0]['course_works'][0]['description']}\"")
                    for ment in mentors],
                  bot.delete_message(call.message.chat.id, call.message.id))
@@ -374,8 +379,8 @@ async def start_show_idea(message):
     subjects = await db.get_subjects()
     for subject in subjects:
         markup.add(
-            types.InlineKeyboardButton(subject['subject'], callback_data='std_sub_for_idea_' + str(subject['id'])))
-    await bot.send_message(message.from_user.id, 'Выберите направление', reply_markup=markup, parse_mode='html')
+            types.InlineKeyboardButton(subject['subject'], callback_data=f'std_sub_for_idea_{subject["id"]}'))
+    await bot.send_message(message.from_user.id, 'Выберите направление', reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("std_sub_for_idea_"))
@@ -387,10 +392,10 @@ async def callback_list_of_ideas_for_sub(call):
     ideas = await db.get_ideas(subjects=[sub_id])
     for idea in ideas:
         markup.add(types.InlineKeyboardButton(
-            idea['description'] + ' -  @' + str((await db.get_mentors(id=idea['mentor']))[0]['name']),
-            callback_data='std_add_idea_' + str(idea['id'])))
+            f'{idea["description"]} -  f{get_pretty_mention_db((await db.get_mentors(id=idea["mentor"]))[0])}',
+            callback_data=f'std_add_idea_{idea["id"]}'))
     await bot.answer_callback_query(call.id)
-    await bot.send_message(call.from_user.id, ideas_str, reply_markup=markup, parse_mode='html')
+    await bot.send_message(call.from_user.id, ideas_str, reply_markup=markup)
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith("std_add_idea_"))
@@ -401,7 +406,8 @@ async def callback_accept_idea(call):
     await gather(
         bot.answer_callback_query(call.id),
         bot.send_message(call.from_user.id, 'Вы успешно взялись за идею от ментора'),
-        bot.send_message((await db.get_mentors(id=idea[0]['mentor']))[0]['chat_id'], f'Вашу идею принял @{call.from_user.username}'),
+        bot.send_message((await db.get_mentors(id=idea[0]['mentor']))[0]['chat_id'],
+                         f'Вашу идею принял {get_pretty_mention(call.from_user)}'),
         db.accept_idea({'name': call.from_user.username, 'chat_id': call.from_user.id}, idea_id)
     )
 

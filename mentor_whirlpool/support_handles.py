@@ -4,6 +4,7 @@ from asyncio import create_task, gather
 import logging
 
 from mentor_whirlpool.database import Database
+from mentor_whirlpool.utils import get_pretty_mention_db, get_pretty_mention, get_link, get_name
 import mentor_whirlpool.support_request_handler
 
 
@@ -78,26 +79,31 @@ async def callback_answer_support_request(call):
     chat_id = call.data[call.data.index('_') + 1:]
 
     mentor = await db.get_mentors(chat_id=chat_id)
+    user = None
     if mentor:
-        username = mentor[0]['name']
+        user = mentor[0]
     else:
         student = await db.get_students(chat_id=chat_id)
         if student:
-            username = student[0]['name']
+            user = student[0]
+
+    if user is None:
+        await bot.send_message(call.from_user.id, 'Невозможно найти пользователя')
+        return
 
     curr_request = await db.get_support_requests(chat_id=chat_id)
     if not curr_request:
         logging.warn(f'chat_id: {call.from_user.id} expired request')
         await gather(bot.send_message(call.from_user.id,
-                                      f'Запрос пользователя @{username} больше не актуален'),
+                                      f'Запрос пользователя {get_pretty_mention_db(user)} больше не актуален'),
                      answ_task)
         return
     curr_request = curr_request[0]
     new_keyboard = types.InlineKeyboardMarkup()
-    new_keyboard.add(types.InlineKeyboardButton(text=f'Помочь пользователю {username}', url=f't.me/{username}'))
+    new_keyboard.add(types.InlineKeyboardButton(text=f'Помочь пользователю {get_name(user)}', url=get_link(user)))
     logging.debug(f'chat_id: {call.from_user.id} preparing cbd support')
     await gather(db.remove_support_request(curr_request['id']),
-                 bot.send_message(chat_id, f'Член поддержки @{call.from_user.username} скоро окажет вам помощь'),
+                 bot.send_message(chat_id, f'Член поддержки {get_pretty_mention(call.from_user)} скоро окажет вам помощь'),
                  bot.edit_message_reply_markup(call.from_user.id, call.message.id, reply_markup=new_keyboard),
                  answ_task)
     logging.debug(f'chat_id: {call.from_user.id} done cbd support')
