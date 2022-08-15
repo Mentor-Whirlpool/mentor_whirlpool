@@ -4,8 +4,9 @@ from asyncio import create_task
 import logging
 import admin_handle
 import mentor_handle
+import student_handle
 from mentor_whirlpool.database import Database
-from mentor_whirlpool.students_handles import generic_start, student_help
+# from mentor_whirlpool.students_handles import generic_start, student_help
 # from mentor_whirlpool.mentor_handles import mentor_start, mentor_help
 from mentor_whirlpool.support_handles import support_start
 
@@ -36,7 +37,7 @@ async def start(message):
     else:
         logging.warn(f'chat_id: {message.from_user.id} is student')
         keyboard.add(*[types.KeyboardButton(task)
-                       for task in await generic_start(message)])
+                       for task in await student_handle.start.generic_start()])
     await bot.send_message(message.from_user.id,
                            'Ваши опции приведены в клавиатуре снизу:',
                            reply_markup=keyboard, parse_mode='Html')
@@ -61,4 +62,4 @@ async def help(message):
     else:
         logging.warn(f'chat_id: {message.from_user.id} is student and requested help')
         await bot.send_message(message.from_user.id,
-                               await student_help(), parse_mode='html')
+                               await student_handle.start.student_help(), parse_mode='html')
