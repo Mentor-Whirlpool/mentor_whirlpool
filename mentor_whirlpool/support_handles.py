@@ -27,7 +27,7 @@ async def support_start(message):
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Актуальные запросы')
-async def check_requests(message):
+async def check_requests(message: types.Message) -> None:
     """
     Display support requests with db.get_support_requests() as buttons
 
@@ -58,7 +58,7 @@ async def check_requests(message):
 
 
 @bot.callback_query_handler(lambda call: call.data.startswith('cbd_'))
-async def callback_answer_support_request(call):
+async def callback_answer_support_request(call: types.CallbackQuery) -> None:
     """
     Handles click on support request button
     If request still actual, buttons changes with single one - redirect to chat with user, who required support
@@ -103,7 +103,8 @@ async def callback_answer_support_request(call):
     new_keyboard.add(types.InlineKeyboardButton(text=f'Помочь пользователю {get_name(user)}', url=get_link(user)))
     logging.debug(f'chat_id: {call.from_user.id} preparing cbd support')
     await gather(db.remove_support_request(curr_request['id']),
-                 bot.send_message(chat_id, f'Член поддержки {get_pretty_mention(call.from_user)} скоро окажет вам помощь'),
+                 bot.send_message(chat_id,
+                                  f'Член поддержки {get_pretty_mention(call.from_user)} скоро окажет вам помощь'),
                  bot.edit_message_reply_markup(call.from_user.id, call.message.id, reply_markup=new_keyboard),
                  answ_task)
     logging.debug(f'chat_id: {call.from_user.id} done cbd support')
