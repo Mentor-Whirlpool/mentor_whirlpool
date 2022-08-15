@@ -10,6 +10,8 @@ from mentor_whirlpool.utils import get_name, get_pretty_mention, get_pretty_ment
 import logging as logging
 import start
 import edit_subject
+import mentors
+import support
 
 
 class AdminStates(StatesGroup):
