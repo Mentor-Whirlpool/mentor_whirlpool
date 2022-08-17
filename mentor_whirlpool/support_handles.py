@@ -8,7 +8,7 @@ from mentor_whirlpool.utils import get_pretty_mention_db, get_pretty_mention, ge
 import mentor_whirlpool.support_request_handler
 
 
-async def support_start(message):
+async def support_start() -> list[str]:
     """
     Should provide a starting point with a ReplyMarkupKeyboard
     It should contain all the following handles
