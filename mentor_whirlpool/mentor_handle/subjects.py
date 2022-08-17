@@ -1,5 +1,8 @@
-from __init__ import bot, Database, logging, types, gather, create_task
-
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from mentor_whirlpool.database import Database
+from asyncio import gather, create_task
+import logging
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои направления')
 async def my_subjects(message: types.Message) -> None:

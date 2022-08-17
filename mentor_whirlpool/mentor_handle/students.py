@@ -1,8 +1,12 @@
-from __init__ import bot, Database, logging, get_pretty_mention_db, types
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from mentor_whirlpool.database import Database
+from mentor_whirlpool.utils import get_pretty_mention_db
+import logging
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Мои студенты')
-async def my_students(message:types.Message)->None:
+async def my_students(message: types.Message) -> None:
     await bot.delete_message(message.chat.id, message.id)
 
     db = Database()
