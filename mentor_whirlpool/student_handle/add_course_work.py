@@ -1,5 +1,17 @@
-from __init__ import bot, Database, logging, types, gather, get_pretty_mention_db, get_name, get_pretty_mention, \
-    StudentStates, create_task
+from telebot.asyncio_handler_backends import StatesGroup, State
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from mentor_whirlpool.database import Database
+from asyncio import gather, create_task
+from mentor_whirlpool.utils import get_pretty_mention, get_pretty_mention_db, get_name
+import logging
+
+
+class StudentStates(StatesGroup):
+    add_work_flag = State()
+    add_own_subject_flag = State()
+    subject = State()
+    topic = State()
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Добавить запрос')

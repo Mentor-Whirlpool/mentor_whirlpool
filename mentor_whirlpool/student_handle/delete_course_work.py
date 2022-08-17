@@ -1,4 +1,9 @@
-from __init__ import bot, Database, logging, types, gather, get_pretty_mention_db, create_task
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from mentor_whirlpool.database import Database
+from asyncio import gather, create_task
+from mentor_whirlpool.utils import get_pretty_mention_db
+import logging
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Удалить запрос')

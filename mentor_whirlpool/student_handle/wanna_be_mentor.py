@@ -1,4 +1,11 @@
-from __init__ import bot, Database, logging, types, random, get_pretty_mention, gather
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from mentor_whirlpool.database import Database
+from asyncio import gather
+from mentor_whirlpool.utils import get_pretty_mention
+import random
+import logging
+
 
 @bot.message_handler(func=lambda msg: msg.text == 'Хочу стать ментором')
 async def mentor_resume(message):
@@ -16,7 +23,8 @@ async def mentor_resume(message):
 
     admin_chat_id = random.choice(admins)['chat_id']
     logging.debug(f'chat_id: {message.from_user.id} preparing BECOME_MENTOR_REQUEST')
-    await gather(bot.send_message(admin_chat_id, f"Пользователь {get_pretty_mention(message.from_user)} хочет стать ментором.",
-                                  reply_markup=markup),
-                 bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!\n"))
+    await gather(
+        bot.send_message(admin_chat_id, f"Пользователь {get_pretty_mention(message.from_user)} хочет стать ментором.",
+                         reply_markup=markup),
+        bot.send_message(message.chat.id, "Ваша заявка на рассмотрении. Ожидайте ответа от администратора!\n"))
     logging.debug(f'chat_id: {message.from_user.id} done BECOME_MENTOR_REQUEST')
