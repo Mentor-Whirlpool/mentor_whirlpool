@@ -1,5 +1,11 @@
-from __init__ import types, Database, bot, logging, gather, get_pretty_mention_db, get_name, support_start, \
-    generic_start
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from mentor_whirlpool.database import Database
+from asyncio import gather
+from mentor_whirlpool.support_handles import support_start
+from mentor_whirlpool.utils import get_name, get_pretty_mention_db
+from mentor_whirlpool.student_handle import start
+import logging
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Менторы')
@@ -88,10 +94,10 @@ async def delete_mentor(call: types.CallbackQuery) -> None:
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_delete_mentor')
     student_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     student_markup.add(*[types.KeyboardButton(task)
-                         for task in await generic_start(None)])
+                         for task in await start.generic_start()])
     if await db.check_is_support(call.from_user.id):
         student_markup.add(*[types.KeyboardButton(task)
-                             for task in await support_start(None)])
+                             for task in await support_start()])
     await gather(
         db.remove_mentor(id_field=mentor_info['id']),
         bot.send_message(call.from_user.id, f'Ментор {get_pretty_mention_db(mentor_info)} был удален'),

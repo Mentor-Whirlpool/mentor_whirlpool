@@ -1,4 +1,14 @@
-from __init__ import types, Database, bot, logging, gather, AdminStates
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from mentor_whirlpool.database import Database
+from asyncio import gather
+from telebot.asyncio_handler_backends import State, StatesGroup
+import logging
+
+
+class AdminStates(StatesGroup):
+    add_subject = State()
+    add_support = State()
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Редактировать направления')
