@@ -1,4 +1,4 @@
-from __init__ import types
+from telebot import types
 
 
 async def admin_start() -> list[str]:

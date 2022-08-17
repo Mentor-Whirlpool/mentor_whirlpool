@@ -1,5 +1,17 @@
-from __init__ import types, Database, bot, logging, gather, AdminStates, generic_start, get_pretty_mention_db, \
-    support_start
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from telebot.asyncio_handler_backends import State, StatesGroup
+from mentor_whirlpool.database import Database
+from asyncio import gather
+from mentor_whirlpool.student_handle import start
+from mentor_whirlpool.support_handles import support_start
+from mentor_whirlpool.utils import get_pretty_mention_db
+import logging
+
+
+class AdminStates(StatesGroup):
+    add_subject = State()
+    add_support = State()
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Редактировать поддержку')
@@ -33,7 +45,7 @@ async def callback_delete_subject(call: types.CallbackQuery) -> None:
     logging.debug(f'chat_id: {call.from_user.id} preparing adm_rem_supp')
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(*[types.KeyboardButton(task)
-                 for task in await generic_start(None)])
+                 for task in await start.generic_start()])
     await gather(
         db.remove_support(supp_id),
         bot.send_message(supp['chat_id'], f'Вы больше не часть поддержки!', reply_markup=markup),
@@ -70,7 +82,7 @@ async def add_support_chat_id_handler(message: types.Message) -> None:
     }
     markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
     markup.add(*[types.KeyboardButton(task)
-                 for task in await support_start(None)])
+                 for task in await support_start()])
     await gather(db.add_support(supp_dict),
                  bot.delete_state(message.from_user.id),
                  bot.send_message(message.from_user.id, 'Саппорт успешно добавлен'),
