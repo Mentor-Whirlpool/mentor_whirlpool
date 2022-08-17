@@ -1,4 +1,9 @@
-from __init__ import bot, Database, logging, types, gather, get_pretty_mention_db, get_pretty_mention
+from mentor_whirlpool.telegram import bot
+from telebot import types
+from mentor_whirlpool.database import Database
+from asyncio import gather
+from mentor_whirlpool.utils import get_pretty_mention, get_pretty_mention_db
+import logging
 
 
 @bot.message_handler(func=lambda msg: msg.text == 'Идеи')
