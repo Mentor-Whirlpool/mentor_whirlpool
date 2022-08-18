@@ -20,7 +20,7 @@ async def start(message):
         logging.warn(f'chat_id: {message.from_user.id} is support')
 
         keyboard.add(*[types.KeyboardButton(task)
-                       for task in await support_start(message)])
+                       for task in await support_start()])
         await bot.send_message(message.chat.id,
                                'Ваши опции приведены в клавиатуре снизу:',
                                reply_markup=keyboard, parse_mode='Html')
