@@ -7,9 +7,7 @@ from mentor_whirlpool.database import Database
 # here will be handles importing
 import mentor_whirlpool.common
 import mentor_whirlpool.confirm
-import mentor_whirlpool.students_handles
-# import mentor_whirlpool.mentor_handles
-# import mentor_whirlpool.admin_handles
+import student_handle
 import admin_handle
 import mentor_handle
 import mentor_whirlpool.support_handles
