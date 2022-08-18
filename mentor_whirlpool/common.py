@@ -31,7 +31,7 @@ async def start(message):
     elif await db.check_is_admin(message.from_user.id):
         logging.warn(f'chat_id: {message.from_user.id} is admin')
         keyboard.add(*[types.KeyboardButton(task)
-                       for task in await mentor_whirlpool.mentor_handle.start.admin_start()])
+                       for task in await mentor_whirlpool.admin_handle.start.admin_start()])
     else:
         logging.warn(f'chat_id: {message.from_user.id} is student')
         keyboard.add(*[types.KeyboardButton(task)
