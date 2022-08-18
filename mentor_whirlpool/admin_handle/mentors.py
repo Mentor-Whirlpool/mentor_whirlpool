@@ -79,7 +79,7 @@ async def callback_mentors_info(call: types.CallbackQuery) -> None:
     delete_mentor = types.InlineKeyboardButton('Удалить ментора', callback_data='admin_delete_mentor_' + call.data[20:])
     markup.add(edit_students, edit_subjects, delete_mentor)
     await bot.answer_callback_query(call.id)
-    message = f'{get_name(mentor_info)}\n----Направления----\n{message_subjects}\n----Студенты----\n{message_students}'
+    message = f'{get_pretty_mention_db(mentor_info)}\n----Направления----\n{message_subjects}\n----Студенты----\n{message_students}'
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_choose_mentor')
     await bot.send_message(call.from_user.id, message, reply_markup=markup)
     await bot.delete_message(call.from_user.id, call.message.id)
