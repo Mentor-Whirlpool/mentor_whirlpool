@@ -1,8 +1,8 @@
 from mentor_whirlpool.telegram import bot
 from telebot import asyncio_filters
-import start
-import edit_subject
-import mentors
-import support
+import mentor_whirlpool.admin_handle.start
+import mentor_whirlpool.admin_handle.edit_subject
+import mentor_whirlpool.admin_handle.mentors
+import mentor_whirlpool.admin_handle.support
 
 bot.add_custom_filter(asyncio_filters.StateFilter(bot))
