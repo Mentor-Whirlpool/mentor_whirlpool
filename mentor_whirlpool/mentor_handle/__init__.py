@@ -1,6 +1,6 @@
-import start
-import course_works
-import students
-import subjects
-import idea
+import mentor_whirlpool.mentor_handle.start
+import mentor_whirlpool.mentor_handle.course_works
+import mentor_whirlpool.mentor_handle.students
+import mentor_whirlpool.mentor_handle.subjects
+import mentor_whirlpool.mentor_handle.idea
 
