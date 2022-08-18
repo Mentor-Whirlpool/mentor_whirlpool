@@ -87,20 +87,16 @@ async def callback_answer_support_request(call: types.CallbackQuery) -> None:
         if student:
             user = student[0]
 
-    if user is None:
-        await bot.send_message(call.from_user.id, 'Невозможно найти пользователя')
-        return
-
     curr_request = await db.get_support_requests(chat_id=chat_id)
     if not curr_request:
         logging.warn(f'chat_id: {call.from_user.id} expired request')
         await gather(bot.send_message(call.from_user.id,
-                                      f'Запрос пользователя {get_pretty_mention_db(user)} больше не актуален'),
+                                      f'Запрос пользователя {get_pretty_mention_db(user) if user is not None else ""} больше не актуален'),
                      answ_task)
         return
     curr_request = curr_request[0]
     new_keyboard = types.InlineKeyboardMarkup()
-    new_keyboard.add(types.InlineKeyboardButton(text=f'Помочь пользователю {get_name(user)}', url=get_link(user)))
+    new_keyboard.add(types.InlineKeyboardButton(text=f'Помочь пользователю {user["name"] if user is not None else ""}', url=f'tg://user?id={chat_id}'))
     logging.debug(f'chat_id: {call.from_user.id} preparing cbd support')
     await gather(db.remove_support_request(curr_request['id']),
                  bot.send_message(chat_id,
