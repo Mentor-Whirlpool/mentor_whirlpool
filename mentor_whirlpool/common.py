@@ -52,7 +52,7 @@ async def help(message):
     elif await db.check_is_admin(message.from_user.id):
         logging.warn(f'chat_id: {message.from_user.id} is admin and requested help')
         await bot.send_message(message.from_user.id,
-                               await mentor_whirlpool.admin_handle.start.admin_start(), parse_mode='html')
+                               await mentor_whirlpool.admin_handle.start.admin_help(), parse_mode='html')
     elif await db.check_is_support(message.from_user.id):
         logging.warn(f'chat_id: {message.from_user.id} is support and requested help')
         await bot.send_message(message.from_user.id,
