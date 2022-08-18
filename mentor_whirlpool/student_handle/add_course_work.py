@@ -4,6 +4,7 @@ from telebot import types
 from mentor_whirlpool.database import Database
 from asyncio import gather, create_task
 from mentor_whirlpool.utils import get_pretty_mention, get_pretty_mention_db, get_name
+from mentor_whirlpool.student_handle.start import generic_start
 import logging
 
 
@@ -102,6 +103,9 @@ async def readmission_request(call: types.CallbackQuery) -> None:
 async def save_request(message: types.Message) -> None:
     logging.debug(f'chat_id: {message.from_user.id} is in add_work_flag')
     entered_topic = message.text
+    keyboard = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    keyboard.add(*[types.KeyboardButton(task)
+                   for task in await generic_start()])
     student_dict = dict()
 
     async with bot.retrieve_data(message.from_user.id, message.chat.id) as data:
@@ -122,7 +126,8 @@ async def save_request(message: types.Message) -> None:
         if entered_topic in course_work_names:
             logging.warn(f'chat_id: {message.from_user.id} work already exists')
             await gather(bot.delete_state(message.from_user.id, message.chat.id),
-                         bot.send_message(message.chat.id, "Работа с такой темой уже добавлена!"))
+                         bot.send_message(message.chat.id, "Работа с такой темой уже добавлена!",
+                                                           reply_markup=keyboard))
             return
     logging.debug(f'chat_id: {message.from_user.id} preparing add_work_flag')
     cw_id = await db.add_course_work(student_dict)
@@ -134,7 +139,8 @@ async def save_request(message: types.Message) -> None:
     await gather(bot.delete_state(message.from_user.id, message.chat.id),
                  bot.send_message(message.chat.id, "Работа успешно добавлена! Ожидайте ответа ментора. "
                                                    "\nЕсли вы захотите запросить дополнительного ментора, нажми кнопку "
-                                                   "__\"Добавить запрос\"__"),
+                                                   "__\"Добавить запрос\"__",
+                                                   reply_markup=keyboard),
                  *[bot.send_message(ment,
                                     f'Поступил новый запрос по вашему направлению: {subject["subject"]} от '
                                     f'{get_pretty_mention_db(student_dict)}!\n'
@@ -152,7 +158,8 @@ async def select_subject_callback(call: types.CallbackQuery) -> None:
     await bot.send_message(call.from_user.id, f"__Тема: {subject['subject']}__\n\n"
                                               f"Введи название работы. \n\n"
                                               f"__Если не знаешь, на какую тему будешь писать работу, "
-                                              f"просто напиши \"Открыт к предложениям\":__")
+                                              f"просто напиши \"Открыт к предложениям\":__",
+                                              reply_markup=types.ReplyKeyboardRemove())
 
     await bot.set_state(call.from_user.id, StudentStates.add_work_flag, call.message.chat.id)
     async with bot.retrieve_data(call.from_user.id, call.message.chat.id) as data:
