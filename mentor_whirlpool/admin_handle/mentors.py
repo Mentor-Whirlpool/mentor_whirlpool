@@ -5,6 +5,7 @@ from asyncio import gather
 from mentor_whirlpool.support_handles import support_start
 from mentor_whirlpool.utils import get_name, get_pretty_mention_db
 from mentor_whirlpool.student_handle import start
+from mentor_whirlpool.mentor_handle.start import mentor_start
 import logging
 
 
@@ -342,3 +343,26 @@ async def callback_user_add_subject(message: types.Message) -> None:
         await gather(bot.send_message(message.from_user.id, f'Тема __{subject}__ успешно добавлена'),
                      db.add_mentor_subjects(mentor['id'], [await db.add_subject(subject)]))
         logging.debug(f'chat_id: {message.from_user.id} done ADD SUBJECT FOR')
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('add_mentor_via_admin_'))
+async def callback_add_mentor(call):
+    db = Database()
+    new_mentor_info = await bot.get_chat(call.data[21:])
+    student_info = await db.get_students(chat_id=call.data[21:])
+    logging.info(f'chat_id: {call.data[21:]} is now a mentor')
+    mentor_markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    mentor_markup.add(*[types.KeyboardButton(task)
+                        for task in await mentor_start()])
+    if await db.check_is_support(call.from_user.id):
+        mentor_markup.add(*[types.KeyboardButton(task)
+                            for task in await support_start()])
+    await gather(db.add_mentor({'name': get_name(new_mentor_info),
+                                'chat_id': call.data[21:],
+                                'subjects': None}),
+                 bot.send_message(call.data[21:], 'Теперь Вы ментор!', reply_markup=mentor_markup),
+                 bot.send_message(call.from_user.id, f'@{new_mentor_info.username} стал ментором'),
+                 bot.answer_callback_query(call.id),
+                 bot.delete_message(call.from_user.id, call.message.id))
+    if student_info:
+        await db.remove_student(student_info[0]['id'])
+
