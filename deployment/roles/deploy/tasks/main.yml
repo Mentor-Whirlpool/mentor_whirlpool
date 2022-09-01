@@ -1,0 +1,12 @@
+- name: Install
+  ansible.builtin.pip:
+    name: git+https://github.com/Mentor-Whirlpool/mentor_whirlpool
+    state: forcereinstall
+
+- name: Restart
+  ansible.builtin.systemd:
+    name: mentorwhirlpool
+    state: restarted
+    enabled: yes
+    masked: no
+    daemon_reload: yes

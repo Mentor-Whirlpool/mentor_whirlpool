@@ -1,0 +1,17 @@
+name: Production deployment
+
+on:
+  label:
+    types:
+      - created
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v3
+      - name: Setup environment
+        run: sudo apt install ansible
+      - name: Deploy
+        run: ansible-playbook --private-key $PRIV_KEY -b deployment/playbook.yml -i deployment/inventory
