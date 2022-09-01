@@ -32,7 +32,7 @@ async def my_subjects(message: types.Message) -> None:
 
     markup = types.InlineKeyboardMarkup(row_width=3)
     add = types.InlineKeyboardButton('Добавить', callback_data='mnt_sub_to_add')
-    message_subjects = '<b>Мои направления</b>\n'
+    message_subjects = '__Мои направления__\n'
 
     if mentor["subjects"]:
         delete = types.InlineKeyboardButton('Удалить', callback_data='mnt_sub_to_delete')
@@ -69,7 +69,7 @@ async def callback_show_subjects_to_add(call: types.CallbackQuery) -> None:
 
     subjects_to_add = await db.get_subjects()
 
-    for subject in mentor["chat_id"]:
+    for subject in mentor["subjects"]:
         subjects_to_add.remove(subject)
 
     if subjects_to_add:
