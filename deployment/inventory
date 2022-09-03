@@ -1,2 +1,2 @@
 [host]
-13.80.16.53    ansible_user=whirlpool
+13.80.16.53    ansible_user=root
