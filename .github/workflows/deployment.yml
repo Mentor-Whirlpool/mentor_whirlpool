@@ -1,9 +1,9 @@
 name: Production deployment
 
 on:
-  label:
-    types:
-      - created
+  push:
+    tags:
+      - '*'
 
 jobs:
   deploy:
