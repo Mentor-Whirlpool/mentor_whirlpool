@@ -16,4 +16,5 @@ jobs:
       - name: Deploy
         run: |
           echo "${{ secrets.PRIV_KEY }}" > privkey
+          echo "13.80.16.53 ${{ secrets.PUB_KEY }}" > ~/.ssh/known_hosts
           ansible-playbook --private-key privkey -b deployment/playbook.yml -i deployment/inventory
