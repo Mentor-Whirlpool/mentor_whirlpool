@@ -14,4 +14,6 @@ jobs:
       - name: Setup environment
         run: sudo apt install ansible
       - name: Deploy
-        run: echo ${{ secrets.PRIV_KEY }} > privkey && ansible-playbook --private-key privkey -b deployment/playbook.yml -i deployment/inventory
+        run: |
+          echo "${{ secrets.PRIV_KEY }}" > privkey
+          ansible-playbook --private-key privkey -b deployment/playbook.yml -i deployment/inventory
