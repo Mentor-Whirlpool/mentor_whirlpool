@@ -14,7 +14,7 @@ async def generic_start() -> list[str]:
         Iterable with all handles texts
     """
     commands = ['Добавить запрос', 'Удалить запрос', 'Мои запросы', 'Идеи',
-                'Хочу стать ментором', 'Поддержка']
+                'Поддержка']
     return commands
 
 
