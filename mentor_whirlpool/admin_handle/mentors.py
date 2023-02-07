@@ -79,12 +79,48 @@ async def callback_mentors_info(call: types.CallbackQuery) -> None:
                                                callback_data='admin_edit_students_' + call.data[20:])
     delete_mentor = types.InlineKeyboardButton('Удалить ментора', callback_data='admin_delete_mentor_' + call.data[20:])
     markup.add(edit_students, edit_subjects, delete_mentor)
+    if mentor_info['archived']:
+        markup.add(types.InlineKeyboardButton('Разархивировать ментора', callback_data=f'admin_unarc_mentor_{call.data[20:]}'))
+    else:
+        markup.add(types.InlineKeyboardButton('Архивировать ментора', callback_data=f'admin_arc_mentor_{call.data[20:]}'))
     await bot.answer_callback_query(call.id)
     message = f'{get_pretty_mention_db(mentor_info)}\n----Направления----\n{message_subjects}\n----Студенты----\n{message_students}'
     logging.debug(f'chat_id: {call.from_user.id} preparing admin_choose_mentor')
     await bot.send_message(call.from_user.id, message, reply_markup=markup)
     await bot.delete_message(call.from_user.id, call.message.id)
     logging.debug(f'chat_id: {call.from_user.id} sent admin_choose_mentor')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('admin_arc_mentor_'))
+async def unarchive_mentor(call: types.CallbackQuery) -> None:
+    db = Database()
+    mentor_info = (await db.get_mentors(chat_id=int(call.data[17:])))[0]
+    logging.debug(f'chat_id: {call.from_user.id} chosen mentor {mentor_info}')
+    logging.debug(f'chat_id: {call.from_user.id} preparing admin_arc_mentor')
+    await gather(
+        db.archive_mentor(id_field=int(mentor_info['id'])),
+        bot.send_message(call.from_user.id, f'Ментор {get_pretty_mention_db(mentor_info)} был заархивирован'),
+        bot.send_message(mentor_info['chat_id'], 'Вам больше не будут поступать запросы на менторство'),
+        bot.delete_message(call.from_user.id, call.message.id),
+        bot.answer_callback_query(call.id)
+    )
+    logging.debug(f'chat_id: {call.from_user.id} done admin_arc_mentor')
+
+
+@bot.callback_query_handler(func=lambda call: call.data.startswith('admin_unarc_mentor_'))
+async def archive_mentor(call: types.CallbackQuery) -> None:
+    db = Database()
+    mentor_info = (await db.get_mentors(chat_id=int(call.data[19:])))[0]
+    logging.debug(f'chat_id: {call.from_user.id} chosen mentor {mentor_info}')
+    logging.debug(f'chat_id: {call.from_user.id} preparing admin_unarc_mentor')
+    await gather(
+        db.unarchive_mentor(id_field=mentor_info['id']),
+        bot.send_message(call.from_user.id, f'Ментор {get_pretty_mention_db(mentor_info)} был разархивирован'),
+        bot.send_message(mentor_info['chat_id'], 'Вам снова могут поступать запросы на менторство'),
+        bot.delete_message(call.from_user.id, call.message.id),
+        bot.answer_callback_query(call.id)
+    )
+    logging.debug(f'chat_id: {call.from_user.id} done admin_unarc_mentor')
 
 
 @bot.callback_query_handler(func=lambda call: call.data.startswith('admin_delete_mentor_'))

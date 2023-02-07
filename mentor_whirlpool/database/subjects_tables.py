@@ -23,7 +23,7 @@ class SubjectsTables:
         """
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
-        await self.db.execute('INSERT INTO SUBJECTS VALUES(DEFAULT, %s, 1) '
+        await self.db.execute('INSERT INTO SUBJECTS VALUES(DEFAULT, %s, 1, FALSE) '
                               'ON CONFLICT (SUBJECT) DO '
                               'UPDATE SET COUNT = EXCLUDED.COUNT + 1 ',
                               (subject,))
@@ -32,7 +32,7 @@ class SubjectsTables:
         await self.db.commit()
         return id_f
 
-    async def remove_subject(self, subj_id):
+    async def remove_subject(self, subj_id: int):
         """
         Removes a line from SUBJECTS table and wherever it is situated
 
@@ -58,7 +58,47 @@ class SubjectsTables:
                                      'WHERE ID = %s', (subj_id,)))
         await self.db.commit()
 
-    async def get_subjects(self, id_field=None, work_id=None, mentor_id=None):
+    async def archive_subject(self, subj_id: int):
+        """
+        Makes a subject unavailable for further interaction
+
+        Parameters
+        ----------
+        subj_id: integer
+            Database ID of a subject
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBDoesNotExists
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('UPDATE SUBJECTS SET ARCHIVED = TRUE '
+                              'WHERE SUBJECT = %s', (subj_id,))
+        await self.db.commit()
+
+    async def archive_subject(self, subj_id: int):
+        """
+        Makes a subject available for further interaction
+
+        Parameters
+        ----------
+        subj_id: integer
+            Database ID of a subject
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBDoesNotExists
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('UPDATE SUBJECTS SET ARCHIVED = FALSE '
+                              'WHERE SUBJECT = %s', (subj_id,))
+        await self.db.commit()
+
+    async def get_subjects(self, id_field=None, work_id=None, mentor_id=None, archived=False):
         """
         Gets all lines from SUBJECTS table
 
@@ -80,7 +120,8 @@ class SubjectsTables:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         if id_field is not None:
             subject = await (await self.db.execute('SELECT * FROM SUBJECTS '
-                                                   'WHERE ID = %s', (id_field,))).fetchone()
+                                                   'WHERE ID = %s',
+                                                   (id_field,))).fetchone()
             return [{'id': subject[0], 'subject': subject[1]}]
         if work_id is not None:
             # this code right here may look horrible and ugly and unreadable
@@ -116,5 +157,7 @@ class SubjectsTables:
                         for id_f in ids]
             return [{'id': subj[0], 'subject': subj[1]} for subj in subjects]
 
-        cur = await (await self.db.execute('SELECT * FROM SUBJECTS')).fetchall()
+        cur = await (await self.db.execute('SELECT * FROM SUBJECTS '
+                                           'WHERE ARCHIVED = %s',
+                                           (archived,))).fetchall()
         return [{'id': subj[0], 'subject': subj[1]} for subj in cur]

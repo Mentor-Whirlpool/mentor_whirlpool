@@ -38,7 +38,8 @@ class Database(StudentTables, CourseWorksTables, AcceptedTables, MentorsTables,
                      self.db.execute('CREATE TABLE IF NOT EXISTS SUBJECTS('
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'SUBJECT TEXT NOT NULL UNIQUE,'
-                                     'COUNT INT)'),
+                                     'COUNT INT,'
+                                     'ARCHIVED BOOLEAN)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS COURSE_WORKS_SUBJECTS('
                                      'COURSE_WORK BIGINT NOT NULL REFERENCES COURSE_WORKS(ID),'
                                      'SUBJECT BIGINT NOT NULL REFERENCES SUBJECTS(ID),'
@@ -55,7 +56,8 @@ class Database(StudentTables, CourseWorksTables, AcceptedTables, MentorsTables,
                                      'ID BIGSERIAL PRIMARY KEY,'
                                      'NAME TEXT NOT NULL,'
                                      'CHAT_ID BIGINT NOT NULL UNIQUE,'
-                                     'LOAD INT)'),
+                                     'LOAD INT,'
+                                     'ARCHIVED BOOLEAN)'),
                      self.db.execute('CREATE TABLE IF NOT EXISTS MENTORS_SUBJECTS('
                                      'MENTOR BIGINT NOT NULL REFERENCES MENTORS(ID),'
                                      'SUBJECT BIGINT NOT NULL REFERENCES SUBJECTS(ID),'

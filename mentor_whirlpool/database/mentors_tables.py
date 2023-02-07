@@ -20,7 +20,7 @@ class MentorsTables:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         (ment_id,) = await (await self.db.execute('INSERT INTO MENTORS VALUES('
-                                                  'DEFAULT, %(name)s, %(chat_id)s, 0) '
+                                                  'DEFAULT, %(name)s, %(chat_id)s, 0, FALSE) '
                                                   'RETURNING ID', line)).fetchone()
         subj_ids = []
         if line['subjects'] is not None:
@@ -29,6 +29,45 @@ class MentorsTables:
                                        '%s, %s) ON CONFLICT DO NOTHING',
                                        (ment_id, subj,)) for subj in subj_ids])
         await self.db.commit()
+
+    async def archive_mentor(self, mentor_id: int):
+        """
+        Makes mentor unavailable for further interactions
+
+        Parameters
+        ----------
+        mentor_id : integer
+            Database ID of a mentor
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBAlreadyExists
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('UPDATE MENTORS SET ARCHIVED = TRUE '
+                              'WHERE ID = %s', (mentor_id,))
+
+    async def unarchive_mentor(self, mentor_id: int):
+                """
+        Makes mentor unavailable for further interactions
+
+        Parameters
+        ----------
+        mentor_id : integer
+            Database ID of a mentor
+
+        Raises
+        ------
+        DBAccessError whatever
+        DBAlreadyExists
+        """
+        if self.db is None:
+            self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
+        await self.db.execute('UPDATE MENTORS SET ARCHIVED = FALSE '
+                              'WHERE ID = %s', (mentor_id,))
+        
 
     async def assemble_mentors_dict(self, cursor):
         list = []
@@ -43,11 +82,12 @@ class MentorsTables:
                 'subjects': await self.get_subjects(mentor_id=i[0]),
                 'load': i[3],
                 'students': students,
+                'archived': i[4],
             }
             list.append(line)
         return list
 
-    async def get_mentors(self, id=None, chat_id=None, student=None):
+    async def get_mentors(self, id=None, chat_id=None, student=None, archived=False):
         """
         Gets all lines from MENTORS table
         If student argument is supplied, search for a mentor for a specific
@@ -74,11 +114,11 @@ class MentorsTables:
             mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
                                                     'WHERE ID = %s',
                                                     (id,))).fetchone()]
-        if chat_id is not None:
+        elif chat_id is not None:
             mentors = [await (await self.db.execute('SELECT * FROM MENTORS '
                                                     'WHERE CHAT_ID = %s',
                                                     (chat_id,))).fetchone()]
-        if student is not None:
+        elif student is not None:
             mentors = await (await self.db.execute('SELECT MENTOR FROM MENTORS_STUDENTS '
                                                    'WHERE STUDENT= %s',
                                                    (student,))).fetchall()
@@ -91,8 +131,10 @@ class MentorsTables:
                                                     'WHERE ID = %s',
                                                     (ment,))).fetchone()
                        for (ment,) in mentors]
-        if id is None and chat_id is None and student is None:
-            mentors = await (await self.db.execute('SELECT * FROM MENTORS')).fetchall()
+        else:
+            mentors = await (await self.db.execute('SELECT * FROM MENTORS '
+                                                   'WHERE ARCHIVED = %s',
+                                                   (archived,))).fetchall()
         return await self.assemble_mentors_dict(mentors)
 
     async def check_is_mentor(self, chat_id):
