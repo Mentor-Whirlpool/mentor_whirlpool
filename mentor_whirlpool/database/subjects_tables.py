@@ -75,10 +75,11 @@ class SubjectsTables:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('UPDATE SUBJECTS SET ARCHIVED = TRUE '
-                              'WHERE SUBJECT = %s', (subj_id,))
+                              'WHERE ID = %s', (subj_id,))
         await self.db.commit()
 
-    async def archive_subject(self, subj_id: int):
+
+    async def unarchive_subject(self, subj_id: int):
         """
         Makes a subject available for further interaction
 
@@ -95,7 +96,7 @@ class SubjectsTables:
         if self.db is None:
             self.db = await psycopg.AsyncConnection.connect(self.conn_opts)
         await self.db.execute('UPDATE SUBJECTS SET ARCHIVED = FALSE '
-                              'WHERE SUBJECT = %s', (subj_id,))
+                              'WHERE ID = %s', (subj_id,))
         await self.db.commit()
 
     async def get_subjects(self, id_field=None, work_id=None, mentor_id=None, archived=False):
