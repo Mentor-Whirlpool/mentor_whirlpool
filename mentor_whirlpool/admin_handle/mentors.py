@@ -3,7 +3,7 @@ from telebot import types
 from mentor_whirlpool.database import Database
 from asyncio import gather
 from mentor_whirlpool.support_handles import support_start
-from mentor_whirlpool.utils import get_name, get_pretty_mention_db
+from mentor_whirlpool.utils import get_name, get_pretty_mention_db, get_pretty_mention
 from mentor_whirlpool.student_handle import start
 from mentor_whirlpool.mentor_handle.start import mentor_start
 import logging
@@ -35,7 +35,7 @@ async def list_mentors(message: types.Message) -> None:
 
         if not mentor['subjects']:
             tasks.append(
-                bot.send_message(message.from_user.id, f'__@{mentor["name"]}__\nНет выбранных направлений',
+                bot.send_message(message.from_user.id, f'__{get_pretty_mention_db(mentor)}__\nНет выбранных направлений',
                                  reply_markup=markup))
             continue
 

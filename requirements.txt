@@ -1,7 +1,8 @@
 pyTelegramBotAPI
 asyncio
-psycopg[c]
+psycopg[binary]
 # для тестов
 asynctest
 coverage
 nose2
+aiohttp
