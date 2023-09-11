@@ -165,7 +165,7 @@ async def callback_add_student(call: types.CallbackQuery) -> None:
     'Добавить студента для '))
 async def callback_user_add_subject(message: types.Message) -> None:
     db = Database()
-    mentor_chat_id, subject_name = message.reply_to_message.text[55:].split()
+    mentor_chat_id, subject_name = message.reply_to_message.text[35:].split(" ", 1)
     subject = None
     for subj in await db.get_subjects():
         if subject_name == subj['subject']:
