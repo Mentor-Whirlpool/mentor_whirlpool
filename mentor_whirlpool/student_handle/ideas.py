@@ -42,8 +42,12 @@ async def callback_list_of_ideas_for_sub(call: types.CallbackQuery) -> None:
         await bot.send_message(call.from_user.id, "Пока идей от менторов нет. Придумай свой вариант!")
         return
     for idea in ideas:
+        idea_mentors = await db.get_mentors(idea["mentor"])
+        idea_mentor = {}
+        if len(idea_mentors) != 0:
+            idea_mentor = idea_mentors[0]
         markup.add(types.InlineKeyboardButton(
-            f'{idea["description"]} -  {idea["mentor"]["name"]}',
+            f'{idea["description"]} -  {idea_mentor["name"]}',
             callback_data=f'std_add_idea_{idea["id"]}'))
     await bot.answer_callback_query(call.id)
     await bot.send_message(call.from_user.id, ideas_str, reply_markup=markup)
